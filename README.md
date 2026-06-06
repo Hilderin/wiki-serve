@@ -160,8 +160,6 @@ browser ──► http://localhost:8765
 | `wiki_search` | Hybrid search for fuzzy/conceptual queries |
 | `wiki_search_exact` | Exact lexical search for specific terms |
 | `wiki_read_section` | Read a full section by heading path |
-| `wiki_reindex` | Force reindexing (`changed-only` or `rebuild`) |
-| `wiki_status` | Index state (doc count, chunk count, …) |
 
 ## Development
 
