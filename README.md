@@ -119,7 +119,7 @@ wiki-serve stdio              # Legacy stdio MCP server
   "mcp": {
     "wiki-serve": {
       "type": "local",
-      "command": ["uv", "run", "python", "-m", "wiki_search.bridge"],
+      "command": ["uv", "run", "wiki-serve", "bridge"],
       "enabled": true,
       "environment": {
         "WIKI_INCLUDE": "./wiki",

@@ -4,7 +4,7 @@
     "wiki-serve": {
       "type": "local",
       "command": [
-        "uv", "run", "python", "-m", "wiki_search.bridge"
+        "uv", "run", "wiki-serve", "bridge"
       ],
       "enabled": true,
       "environment": {
