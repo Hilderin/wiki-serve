@@ -14,7 +14,15 @@ class DatabaseManager:
             self._conn.execute("PRAGMA journal_mode=WAL")
             self._conn.execute("PRAGMA foreign_keys=ON")
             self._conn.row_factory = sqlite3.Row
+            self._enable_vec()
         return self._conn
+
+    def _enable_vec(self) -> None:
+        try:
+            import sqlite_vec
+            sqlite_vec.load(self._conn)
+        except Exception:
+            pass
 
     def close(self) -> None:
         if self._conn:

@@ -11,6 +11,9 @@ class WikiSearchConfig:
     reindex_on_start: bool
     host: str = "127.0.0.1"
     port: int = 8765
+    embedding_enabled: bool = True
+    embedding_model: str = "all-MiniLM-L6-v2"
+    embedding_device: str = "cpu"
 
     @classmethod
     def from_env(cls) -> "WikiSearchConfig":
@@ -26,6 +29,9 @@ class WikiSearchConfig:
             reindex_on_start=os.environ.get("WIKI_REINDEX_ON_START", "true").lower() in ("true", "1", "yes"),
             host=os.environ.get("WIKI_HOST", "127.0.0.1"),
             port=int(os.environ.get("WIKI_PORT", "8765")),
+            embedding_enabled=os.environ.get("WIKI_EMBEDDING_ENABLED", "true").lower() in ("true", "1", "yes"),
+            embedding_model=os.environ.get("WIKI_EMBEDDING_MODEL", "all-MiniLM-L6-v2"),
+            embedding_device=os.environ.get("WIKI_EMBEDDING_DEVICE", "cpu"),
         )
 
     def get_watch_paths(self) -> list[Path]:

@@ -9,6 +9,7 @@ Local wiki search service with MCP over HTTP/SSE and a web UI. Indexes markdown 
 - **Multi-path indexing** — index any number of files and directories via `WIKI_INCLUDE`
 - **Web UI** — search, browse sections, open files in VS Code directly from your browser
 - **FTS5 full-text search** — fast, ranked results with BM25 scoring and heading boost
+- **Hybrid vector search** — RRF fusion between FTS5 and embedding-based semantic search (384-dim, `all-MiniLM-L6-v2`)
 - **File watching** — automatic reindex on file changes (via watchdog)
 - **Backward compatible** — stdio MCP server still available
 
@@ -104,6 +105,9 @@ wiki-serve stdio              # Legacy stdio MCP server
 | `WIKI_PORT` | `8765` | HTTP port |
 | `WIKI_WATCH` | `true` | Enable file watching |
 | `WIKI_REINDEX_ON_START` | `true` | Reindex on startup |
+| `WIKI_EMBEDDING_ENABLED` | `true` | Enable vector search (requires model download on first run) |
+| `WIKI_EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model name |
+| `WIKI_EMBEDDING_DEVICE` | `cpu` | Device for embedding model (`cpu` or `cuda`) |
 
 ---
 
@@ -153,12 +157,28 @@ opencode ──HTTP/SSE──► wiki-serve daemon (:8765)
 browser ──► http://localhost:8765
 ```
 
+## Search
+
+### Hybrid vector search
+
+When `WIKI_EMBEDDING_ENABLED=true` (default), `wiki_search` combines:
+- **FTS5 (BM25)** — keyword/lexical matching
+- **Vector search** — semantic similarity via `all-MiniLM-L6-v2` embeddings, stored in SQLite via `sqlite-vec`
+
+Results are fused using **Reciprocal Rank Fusion (RRF)**. On first run, the embedding model (~80MB) is downloaded automatically from Hugging Face.
+
+Set `WIKI_EMBEDDING_ENABLED=false` to fall back to pure FTS5 (no model download, no GPU memory).
+
+### Exact search
+
+`wiki_search_exact` uses pure FTS5 — useful for specific terms, identifiers, class names, or file paths.
+
 ## MCP tools
 
 | Tool | Description |
 |------|-------------|
-| `wiki_search` | Hybrid search for fuzzy/conceptual queries |
-| `wiki_search_exact` | Exact lexical search for specific terms |
+| `wiki_search` | Hybrid (FTS5 + vector) search for fuzzy/conceptual queries |
+| `wiki_search_exact` | Exact lexical search for specific terms, IDs, file names |
 | `wiki_read_section` | Read a full section by heading path |
 
 ## Development

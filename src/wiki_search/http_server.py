@@ -16,6 +16,7 @@ from .db.schema import initialize_database
 from .index.indexer import Indexer
 from .search.hybrid_search import HybridSearcher
 from .search.exact_search import ExactSearcher
+from .search.embedder import Embedder
 from .search.rank import normalize_bm25_score, rerank_with_heading_boost
 from .db.repository import DocumentRepository, ChunkRepository
 
@@ -42,8 +43,7 @@ def _make_vscode_url():
 
 
 def _format_search_result(r: dict) -> dict:
-    bm25 = r.pop("bm25", 0)
-    score = normalize_bm25_score(bm25)
+    score = r.get("score") or normalize_bm25_score(r.pop("bm25", 0))
     excerpt = (r.get("content") or "")[:300].replace("\n", " ")
     vscode = _make_vscode_url()
     return {
@@ -66,10 +66,13 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     db = DatabaseManager(config.index_path)
     initialize_database(db)
 
-    indexer = Indexer(db, config)
+    embedder = Embedder(config.embedding_model, config.embedding_device) if config.embedding_enabled else None
+    if embedder is not None:
+        embedder.load()
+    indexer = Indexer(db, config, embedder=embedder)
     if config.reindex_on_start:
         indexer.reindex_changed_only()
-    hybrid = HybridSearcher(db)
+    hybrid = HybridSearcher(db, embedder=embedder)
     exact = ExactSearcher(db)
     doc_repo = DocumentRepository(db)
     chunk_repo = ChunkRepository(db)
@@ -80,8 +83,8 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     def wiki_search(query: str, limit: int = 10) -> str:
         results = hybrid.search(query, limit)
         for r in results:
-            bm25 = r.pop("bm25", 0)
-            r["score"] = normalize_bm25_score(bm25)
+            if "bm25" in r:
+                r["score"] = normalize_bm25_score(r.pop("bm25"))
         results = rerank_with_heading_boost(results, query)
         lines = [f"Query: {query} | Results: {len(results)}"]
         for r in results:
@@ -119,7 +122,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
             f"{content}"
         )
 
-    app = FastAPI(title="Wiki Search Service", version=__version__)
+    app = FastAPI(title="Wiki Serve", version=__version__)
 
     sse_app = mcp.sse_app()
     app.mount("/mcp", sse_app)
@@ -141,7 +144,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     async def api_search(q: str = Query(default=""), limit: int = Query(default=20)):
         if not q.strip():
             return JSONResponse({"results": []})
-        raw = exact.search(q, limit)
+        raw = hybrid.search(q, limit)
         results = [_format_search_result(r) for r in raw]
         results = rerank_with_heading_boost(results, q)
         return JSONResponse({"query": q, "results": results})

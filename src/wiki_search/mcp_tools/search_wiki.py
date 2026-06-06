@@ -45,8 +45,8 @@ async def handle_search_exact(searcher, arguments: dict) -> list[TextContent]:
 
 def _format_results(query: str, results: list[dict]) -> list[TextContent]:
     for r in results:
-        bm25 = r.pop("bm25", 0)
-        r["score"] = normalize_bm25_score(bm25)
+        if "bm25" in r:
+            r["score"] = normalize_bm25_score(r.pop("bm25"))
 
     results = rerank_with_heading_boost(results, query)
 

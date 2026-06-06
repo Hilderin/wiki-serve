@@ -1,3 +1,4 @@
+import struct
 from typing import Any
 
 
@@ -26,6 +27,7 @@ class DocumentRepository:
         conn = self.db.conn
         doc = conn.execute("SELECT id FROM documents WHERE path = ?", (path,)).fetchone()
         if doc:
+            conn.execute("DELETE FROM chunks_vectors WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id = ?)", (doc["id"],))
             conn.execute("DELETE FROM chunks WHERE document_id = ?", (doc["id"],))
             conn.execute("DELETE FROM documents WHERE id = ?", (doc["id"],))
 
@@ -88,6 +90,49 @@ class ChunkRepository:
         rows = self.db.conn.execute(
             "SELECT * FROM chunks WHERE path = ? AND heading_path = ? ORDER BY start_line",
             (path, heading_path),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def document_has_embeddings(self, document_id: int) -> bool:
+        row = self.db.conn.execute(
+            """SELECT 1 FROM chunks c
+               LEFT JOIN chunks_vectors v ON v.chunk_id = c.id
+               WHERE c.document_id = ? AND v.chunk_id IS NULL
+               LIMIT 1""",
+            (document_id,),
+        ).fetchone()
+        return row is None
+
+    def get_chunk_ids_for_document(self, document_id: int) -> list[int]:
+        rows = self.db.conn.execute(
+            "SELECT id FROM chunks WHERE document_id = ?", (document_id,)
+        ).fetchall()
+        return [r["id"] for r in rows]
+
+    def insert_embedding(self, chunk_id: int, embedding: list[float]) -> None:
+        vec = struct.pack(f"{len(embedding)}f", *embedding)
+        self.db.conn.execute(
+            "INSERT OR REPLACE INTO chunks_vectors (chunk_id, embedding) VALUES (?, ?)",
+            (chunk_id, vec),
+        )
+
+    def delete_embeddings_for_document(self, document_id: int) -> None:
+        conn = self.db.conn
+        chunk_ids = conn.execute(
+            "SELECT id FROM chunks WHERE document_id = ?", (document_id,)
+        ).fetchall()
+        for cid in chunk_ids:
+            conn.execute("DELETE FROM chunks_vectors WHERE chunk_id = ?", (cid["id"],))
+
+    def search_vector(self, embedding: list[float], limit: int = 10) -> list[dict[str, Any]]:
+        vec = struct.pack(f"{len(embedding)}f", *embedding)
+        rows = self.db.conn.execute(
+            """SELECT c.id, c.path, c.heading_path, c.heading_level, c.content,
+                      c.start_line, c.end_line, distance
+               FROM chunks_vectors
+               JOIN chunks c ON chunks_vectors.chunk_id = c.id
+               WHERE embedding MATCH ? AND k = ?""",
+            (vec, limit),
         ).fetchall()
         return [dict(r) for r in rows]
 

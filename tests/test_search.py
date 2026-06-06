@@ -18,12 +18,63 @@ def test_search_basic(wiki_dir, indexer, searcher):
     assert results[0]["path"] == rel_path(filepath)
 
 
-def test_search_no_results(wiki_dir, indexer, searcher):
-    (wiki_dir / "doc.md").write_text("# Document\n\nSome content.\n")
+def test_hybrid_search_empty(wiki_dir, indexer, hybrid_searcher):
+    results = hybrid_searcher.search("nothing")
+    assert results == []
+
+
+def test_hybrid_search_basic(wiki_dir, indexer, hybrid_searcher):
+    filepath = wiki_dir / "doc.md"
+    filepath.write_text("# Document\n\nThis is important content about agents.\n")
     indexer.reindex_changed_only()
 
-    results = searcher.search("xyznonexistent")
-    assert results == []
+    results = hybrid_searcher.search("agents")
+    assert len(results) >= 1
+    assert results[0]["path"] == rel_path(filepath)
+    assert results[0]["score"] >= 0
+
+
+def test_missing_embeddings_are_rebuilt(wiki_dir, indexer, hybrid_searcher, db):
+    filepath = wiki_dir / "doc.md"
+    filepath.write_text("# Document\n\nImportant content about agents.\n")
+    indexer.reindex_changed_only()
+
+    from wiki_search.db.repository import ChunkRepository
+    repo = ChunkRepository(db)
+    doc = db.conn.execute("SELECT id FROM documents LIMIT 1").fetchone()
+    has_vec = repo.document_has_embeddings(doc["id"])
+    assert has_vec
+
+    db.conn.execute("DELETE FROM chunks_vectors")
+    db.conn.commit()
+    has_vec = repo.document_has_embeddings(doc["id"])
+    assert not has_vec
+
+    indexer.reindex_changed_only()
+    has_vec = repo.document_has_embeddings(doc["id"])
+    assert has_vec
+
+
+def test_hybrid_search_fuses_results(wiki_dir, indexer, hybrid_searcher):
+    (wiki_dir / "a.md").write_text("# Architecture\n\nAgents handle handoff.\n")
+    (wiki_dir / "b.md").write_text("# Backup\n\nBackup configuration.\n")
+    indexer.reindex_changed_only()
+
+    results = hybrid_searcher.search("agents", limit=5)
+    assert len(results) >= 1
+    assert all("score" in r for r in results)
+
+
+def test_hybrid_search_without_embedder(wiki_dir, indexer, db):
+    from wiki_search.search.hybrid_search import HybridSearcher
+    searcher = HybridSearcher(db, embedder=None)
+    filepath = wiki_dir / "doc.md"
+    filepath.write_text("# Document\n\nImportant content about agents.\n")
+    indexer.reindex_changed_only()
+
+    results = searcher.search("agents")
+    assert len(results) >= 1
+    assert results[0]["path"] == rel_path(filepath)
 
 
 def test_search_multiple_terms(wiki_dir, indexer, searcher):

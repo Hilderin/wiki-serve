@@ -27,6 +27,11 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
     heading_path,
     path
 );
+
+CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vectors USING vec0(
+    chunk_id INTEGER PRIMARY KEY,
+    embedding FLOAT[384]
+);
 """
 
 

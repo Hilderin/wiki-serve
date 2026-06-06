@@ -25,3 +25,28 @@ def rerank_with_heading_boost(results: list[dict], query: str, boost_factor: flo
 
     results.sort(key=lambda x: x.get("score", 0), reverse=True)
     return results
+
+
+def rrf_fuse(fts_results: list[dict], vec_results: list[dict], limit: int, k: int = 60) -> list[dict]:
+    seen: dict[int, dict] = {}
+    fused: dict[int, float] = {}
+
+    for rank, r in enumerate(fts_results):
+        cid = r["id"]
+        r["score"] = 0.0
+        r["distance"] = None
+        seen[cid] = r
+        fused[cid] = fused.get(cid, 0.0) + 1.0 / (k + rank + 1)
+
+    for rank, r in enumerate(vec_results):
+        cid = r["id"]
+        r["score"] = 0.0
+        if cid not in seen:
+            seen[cid] = r
+        fused[cid] = fused.get(cid, 0.0) + 1.0 / (k + rank + 1)
+
+    for cid in fused:
+        seen[cid]["score"] = round(fused[cid], 4)
+
+    sorted_results = sorted(seen.values(), key=lambda x: x["score"], reverse=True)
+    return sorted_results[:limit]

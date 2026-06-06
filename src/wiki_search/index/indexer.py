@@ -5,6 +5,7 @@ from pathlib import Path
 
 from ..config import WikiSearchConfig
 from ..db.repository import DocumentRepository, ChunkRepository
+from ..search.embedder import Embedder
 from . import markdown_chunker as chunker
 
 _cwd = Path.cwd()
@@ -19,22 +20,26 @@ def rel_path(filepath: Path) -> str:
 
 
 class Indexer:
-    def __init__(self, db, config: WikiSearchConfig):
+    def __init__(self, db, config: WikiSearchConfig, embedder: Embedder | None = None):
         self.db = db
         self.config = config
         self.doc_repo = DocumentRepository(db)
         self.chunk_repo = ChunkRepository(db)
+        self.embedder = embedder
         self._log_path = config.index_path.parent / "wiki.indexation.log"
         config.index_path.parent.mkdir(parents=True, exist_ok=True)
         self._log("STARTUP", f"Indexer initialized (paths={config.include_paths})")
 
     def _log(self, level: str, message: str) -> None:
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+        line = f"{ts} | {level:7s} | {message}"
         try:
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
             with open(self._log_path, "a", encoding="utf-8") as f:
-                f.write(f"{ts} | {level:7s} | {message}\n")
+                f.write(line + "\n")
         except OSError:
             pass
+        if level in ("INDEXING", "VECTORS", "INDEXED", "VECTORED", "DELETED", "REINDEX", "REBUILD", "STARTUP", "UP-TO-DATE"):
+            print(f"[wiki-serve] {line}", flush=True)
 
     def index_file(self, filepath: Path) -> bool:
         filepath = filepath.resolve()
@@ -47,6 +52,21 @@ class Indexer:
 
         existing = self.doc_repo.get_document_by_path(path_str)
         if existing and existing["hash"] == content_hash:
+            if self.embedder is not None and not self.chunk_repo.document_has_embeddings(existing["id"]):
+                self._log("VECTORS", f"Adding missing embeddings: {path_str}")
+                chunk_ids = self.chunk_repo.get_chunk_ids_for_document(existing["id"])
+                chunk_contents = []
+                for cid in chunk_ids:
+                    row = self.db.conn.execute(
+                        "SELECT content FROM chunks WHERE id = ?", (cid,)
+                    ).fetchone()
+                    chunk_contents.append((cid, row["content"]))
+                embeddings = self.embedder.embed_batch([c for _, c in chunk_contents])
+                for (cid, _), emb in zip(chunk_contents, embeddings):
+                    self.chunk_repo.insert_embedding(cid, emb)
+                self.db.conn.commit()
+                self._log("VECTORED", path_str)
+                return True
             self._log("UP-TO-DATE", path_str)
             return False
 
@@ -59,16 +79,25 @@ class Indexer:
         self.chunk_repo.delete_chunks_for_document(doc_id)
 
         chunks = chunker.chunk_file(filepath)
+        embed_texts = []
         for ch in chunks:
             ch["path"] = path_str
             if not ch["heading_path"]:
                 ch["heading_path"] = title or path_str
                 ch["heading_level"] = 0
-            self.chunk_repo.insert_chunk(
+            chunk_id = self.chunk_repo.insert_chunk(
                 doc_id, ch["path"], ch["heading_path"],
                 ch["heading_level"], ch["content"],
                 ch["content_hash"], ch["start_line"], ch["end_line"],
             )
+            ch["_chunk_id"] = chunk_id
+            if self.embedder is not None:
+                embed_texts.append(ch["content"])
+
+        if self.embedder is not None and embed_texts:
+            embeddings = self.embedder.embed_batch(embed_texts)
+            for ch, emb in zip(chunks, embeddings):
+                self.chunk_repo.insert_embedding(ch["_chunk_id"], emb)
 
         conn.commit()
         self._log("INDEXED", path_str)
@@ -118,6 +147,7 @@ class Indexer:
     def rebuild(self) -> int:
         self._log("REBUILD", "Starting full rebuild")
         conn = self.db.conn
+        conn.execute("DELETE FROM chunks_vectors")
         conn.execute("DELETE FROM chunks_fts")
         conn.execute("DELETE FROM chunks")
         conn.execute("DELETE FROM documents")

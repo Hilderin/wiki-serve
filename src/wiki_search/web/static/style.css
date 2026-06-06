@@ -41,6 +41,14 @@ header h1 {
 header h1 a {
   text-decoration: none;
   color: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logo {
+  width: 32px;
+  height: 32px;
 }
 
 header nav a {
