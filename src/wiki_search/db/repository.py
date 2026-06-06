@@ -1,0 +1,119 @@
+from typing import Any
+
+
+class DocumentRepository:
+    def __init__(self, db):
+        self.db = db
+
+    def upsert_document(self, path: str, title: str, content_hash: str, mtime: float, size: int) -> int:
+        conn = self.db.conn
+        existing = conn.execute(
+            "SELECT id FROM documents WHERE path = ?", (path,)
+        ).fetchone()
+        if existing:
+            conn.execute(
+                "UPDATE documents SET hash = ?, mtime = ?, size = ?, indexed_at = datetime('now') WHERE id = ?",
+                (content_hash, mtime, size, existing["id"]),
+            )
+            return existing["id"]
+        cursor = conn.execute(
+            "INSERT INTO documents (path, title, hash, mtime, size) VALUES (?, ?, ?, ?, ?)",
+            (path, title, content_hash, mtime, size),
+        )
+        return cursor.lastrowid
+
+    def delete_document(self, path: str) -> None:
+        conn = self.db.conn
+        doc = conn.execute("SELECT id FROM documents WHERE path = ?", (path,)).fetchone()
+        if doc:
+            conn.execute("DELETE FROM chunks WHERE document_id = ?", (doc["id"],))
+            conn.execute("DELETE FROM documents WHERE id = ?", (doc["id"],))
+
+    def get_document_by_path(self, path: str) -> dict[str, Any] | None:
+        row = self.db.conn.execute(
+            "SELECT * FROM documents WHERE path = ?", (path,)
+        ).fetchone()
+        return dict(row) if row else None
+
+    def get_all_documents(self) -> list[dict[str, Any]]:
+        rows = self.db.conn.execute("SELECT * FROM documents").fetchall()
+        return [dict(r) for r in rows]
+
+    def count_documents(self) -> int:
+        row = self.db.conn.execute("SELECT COUNT(*) as cnt FROM documents").fetchone()
+        return row["cnt"]
+
+    def count_chunks(self) -> int:
+        row = self.db.conn.execute("SELECT COUNT(*) as cnt FROM chunks").fetchone()
+        return row["cnt"]
+
+
+class ChunkRepository:
+    def __init__(self, db):
+        self.db = db
+
+    def delete_chunks_for_document(self, document_id: int) -> None:
+        conn = self.db.conn
+        chunk_ids = conn.execute(
+            "SELECT id FROM chunks WHERE document_id = ?", (document_id,)
+        ).fetchall()
+        for cid in chunk_ids:
+            conn.execute("DELETE FROM chunks_fts WHERE rowid = ?", (cid["id"],))
+        conn.execute("DELETE FROM chunks WHERE document_id = ?", (document_id,))
+
+    def insert_chunk(
+        self,
+        document_id: int,
+        path: str,
+        heading_path: str | None,
+        heading_level: int,
+        content: str,
+        content_hash: str,
+        start_line: int,
+        end_line: int,
+    ) -> int:
+        conn = self.db.conn
+        cursor = conn.execute(
+            "INSERT INTO chunks (document_id, path, heading_path, heading_level, content, content_hash, start_line, end_line) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (document_id, path, heading_path, heading_level, content, content_hash, start_line, end_line),
+        )
+        chunk_id = cursor.lastrowid
+        conn.execute(
+            "INSERT INTO chunks_fts (rowid, content, heading_path, path) VALUES (?, ?, ?, ?)",
+            (chunk_id, content, heading_path or "", path),
+        )
+        return chunk_id
+
+    def get_chunks_by_heading(self, path: str, heading_path: str) -> list[dict[str, Any]]:
+        rows = self.db.conn.execute(
+            "SELECT * FROM chunks WHERE path = ? AND heading_path = ? ORDER BY start_line",
+            (path, heading_path),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def search_fts(self, query: str, limit: int = 10) -> list[dict[str, Any]]:
+        fts_query = self._prepare_query(query)
+        if not fts_query:
+            return []
+        rows = self.db.conn.execute(
+            """SELECT c.id, c.path, c.heading_path, c.heading_level, c.content,
+                      c.start_line, c.end_line, rank AS bm25
+               FROM chunks_fts
+               JOIN chunks c ON chunks_fts.rowid = c.id
+               WHERE chunks_fts MATCH ?
+               ORDER BY rank
+               LIMIT ?""",
+            (fts_query, limit),
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def _prepare_query(self, query: str) -> str:
+        query = query.strip()
+        if not query:
+            return ""
+        if any(op in query for op in ('"', "'", "(", ")", "*", "NEAR", "AND", "OR", "NOT")):
+            return query
+        terms = query.split()
+        if not terms:
+            return ""
+        return " AND ".join(f'"{t}"' for t in terms)

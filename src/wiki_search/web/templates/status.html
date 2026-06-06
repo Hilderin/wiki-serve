@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Status - Wiki Search{% endblock %}
+
+{% block content %}
+<h2 style="font-size:18px;margin-bottom:16px">Index Status</h2>
+
+<div class="status-grid">
+  <div class="status-card">
+    <div class="value">{{ doc_count }}</div>
+    <div class="label">Documents</div>
+  </div>
+  <div class="status-card">
+    <div class="value">{{ chunk_count }}</div>
+    <div class="label">Chunks</div>
+  </div>
+  <div class="status-card">
+    <div class="value">{{ watcher }}</div>
+    <div class="label">File Watcher</div>
+  </div>
+</div>
+
+<div style="margin-top:20px;font-size:13px;color:#666">
+  <p>Include paths:</p>
+  <ul style="margin-top:4px;margin-left:16px">
+  {% for p in include_paths %}
+    <li><code>{{ p }}</code></li>
+  {% endfor %}
+  </ul>
+  <p style="margin-top:8px">Last indexed: <code>{{ last_indexed }}</code></p>
+</div>
+
+<button class="reindex-btn" id="reindexBtn">Reindex Changed Files</button>
+<div id="reindexResult" style="margin-top:8px"></div>
+
+<script>
+document.getElementById('reindexBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('reindexBtn');
+  const result = document.getElementById('reindexResult');
+  btn.disabled = true;
+  result.innerHTML = '<div class="loading"><div class="spinner"></div></div>';
+  try {
+    const r = await fetch('/api/reindex?mode=changed-only', { method: 'POST' });
+    const data = await r.json();
+    result.innerHTML = `<div class="flash flash-success">${data.message}</div>`;
+  } catch (err) {
+    result.innerHTML = `<div class="flash flash-error">${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,18 @@
+[Unit]
+Description=Wiki Search Service (wiki-serve)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/wiki-serve serve
+Restart=on-failure
+RestartSec=5
+Environment=WIKI_INCLUDE=%h/wiki
+Environment=WIKI_INDEX=%h/.wiki-index/wiki.sqlite
+Environment=WIKI_HOST=127.0.0.1
+Environment=WIKI_PORT=8765
+Environment=WIKI_WATCH=true
+Environment=WIKI_REINDEX_ON_START=true
+
+[Install]
+WantedBy=default.target

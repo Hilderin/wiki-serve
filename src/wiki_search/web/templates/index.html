@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Wiki Search{% endblock %}
+
+{% block content %}
+<form class="search-form" id="searchForm">
+  <input type="text" id="queryInput" name="q" placeholder="Search the wiki..." value="{{ query or '' }}" autofocus>
+  <button type="submit" id="searchBtn">Search</button>
+</form>
+
+<div id="results">
+  {% if query %}
+  <div class="results-count">{{ results|length }} result(s) for "{{ query }}"</div>
+  {% for r in results %}
+  <div class="result-card">
+    <div class="result-header">
+      <a class="result-path" href="{{ vscode_url(r.path, r.start_line) }}" title="Open in VS Code">{{ r.path }}:{{ r.start_line }}</a>
+      {% if r.heading_path %}
+      <span class="result-heading">› {{ r.heading_path }}</span>
+      {% endif %}
+      <span class="result-score">{{ "%.2f"|format(r.score) }}</span>
+    </div>
+    <div class="result-excerpt">{{ r.excerpt }}</div>
+    <div style="margin-top:6px">
+      <a href="/section?path={{ r.path|urlencode }}&heading={{ r.heading_path|urlencode if r.heading_path else '' }}" style="font-size:12px;color:#4a90d9">View section →</a>
+    </div>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="empty-state">
+    <p>Enter a search query to find content in the wiki.</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('searchForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const q = document.getElementById('queryInput').value.trim();
+  if (!q) return;
+
+  const btn = document.getElementById('searchBtn');
+  btn.disabled = true;
+  btn.textContent = 'Searching...';
+
+  try {
+    const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+
+    const resultsDiv = document.getElementById('results');
+    if (data.results.length === 0) {
+      resultsDiv.innerHTML = `<div class="results-count">0 results for "${q}"</div><div class="empty-state"><p>No results found.</p></div>`;
+      return;
+    }
+
+    let html = `<div class="results-count">${data.results.length} result(s) for "${q}"</div>`;
+    for (const r of data.results) {
+      html += `
+        <div class="result-card">
+          <div class="result-header">
+            <a class="result-path" href="${r.vscode_url}" title="Open in VS Code">${r.path}:${r.start_line}</a>
+            ${r.heading_path ? `<span class="result-heading">› ${r.heading_path}</span>` : ''}
+            <span class="result-score">${r.score.toFixed(2)}</span>
+          </div>
+          <div class="result-excerpt">${r.excerpt}</div>
+          <div style="margin-top:6px">
+            <a href="/section?path=${encodeURIComponent(r.path)}&heading=${encodeURIComponent(r.heading_path || '')}" style="font-size:12px;color:#4a90d9">View section →</a>
+          </div>
+        </div>`;
+    }
+    resultsDiv.innerHTML = html;
+  } catch (err) {
+    document.getElementById('results').innerHTML = `<div class="flash flash-error">Search failed: ${err.message}</div>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Search';
+  }
+});
+</script>
+{% endblock %}

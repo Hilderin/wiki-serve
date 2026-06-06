@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Wiki Search{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>📖</text></svg>">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1><a href="/">Wiki Search</a></h1>
+      <nav>
+        <a href="/">Search</a>
+        <a href="/status">Status</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="container">
+    {% block content %}{% endblock %}
+  </div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

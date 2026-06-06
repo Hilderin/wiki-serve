@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}{{ heading or path }} - Wiki Search{% endblock %}
+
+{% block content %}
+<a href="/?q={{ query|urlencode if query else '' }}" style="font-size:13px;color:#4a90d9;text-decoration:none;display:inline-block;margin-bottom:16px">← Back to search</a>
+
+<div class="section-viewer">
+  <div class="section-meta">
+    <a class="path" href="{{ vscode_url(path, start_line) }}" title="Open in VS Code">{{ path }}:{{ start_line }}</a>
+    {% if heading %}
+    <div class="heading">{{ heading }}</div>
+    {% endif %}
+    <div class="lines">Lines {{ start_line }}–{{ end_line }}</div>
+  </div>
+  <div class="section-content">{{ content }}</div>
+</div>
+{% endblock %}
