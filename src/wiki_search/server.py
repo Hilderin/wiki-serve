@@ -24,7 +24,7 @@ from .mcp_tools.read_section import READ_SECTION_TOOL, handle_read_section
 
 async def main_stdio() -> None:
     config = WikiSearchConfig.from_env()
-    config.index_path.parent.mkdir(parents=True, exist_ok=True)
+    config.data_dir.mkdir(parents=True, exist_ok=True)
 
     db = DatabaseManager(config.index_path)
     initialize_database(db)

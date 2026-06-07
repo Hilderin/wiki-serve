@@ -9,7 +9,7 @@
       "enabled": true,
       "environment": {
         "WIKI_INCLUDE": "./wiki",
-        "WIKI_INDEX": "./.wiki-index/wiki.sqlite",
+        "WIKI_DATA_DIR": "./.wiki-index",
         "WIKI_HOST": "127.0.0.1",
         "WIKI_PORT": "8765",
         "WIKI_WATCH": "true",

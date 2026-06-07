@@ -19,6 +19,7 @@ from .search.exact_search import ExactSearcher
 from .search.embedder import Embedder
 from .search.rank import normalize_bm25_score, rerank_with_heading_boost
 from .db.repository import DocumentRepository, ChunkRepository
+from .index.watcher import start_watcher
 
 
 TEMPLATES_DIR = Path(__file__).parent / "web" / "templates"
@@ -61,7 +62,7 @@ def _format_search_result(r: dict) -> dict:
 def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     if config is None:
         config = WikiSearchConfig.from_env()
-    config.index_path.parent.mkdir(parents=True, exist_ok=True)
+    config.data_dir.mkdir(parents=True, exist_ok=True)
 
     db = DatabaseManager(config.index_path)
     initialize_database(db)
@@ -72,6 +73,11 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     indexer = Indexer(db, config, embedder=embedder)
     if config.reindex_on_start:
         indexer.reindex_changed_only()
+
+    observer = None
+    if config.watch:
+        observer = start_watcher(config, indexer)
+
     hybrid = HybridSearcher(db, embedder=embedder)
     exact = ExactSearcher(db)
     doc_repo = DocumentRepository(db)
@@ -124,6 +130,12 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     app = FastAPI(title="Wiki Serve", version=__version__)
 
+    if observer is not None:
+        @app.on_event("shutdown")
+        async def _stop_watcher():
+            observer.stop()
+            observer.join()
+
     sse_app = mcp.sse_app()
     app.mount("/mcp", sse_app)
 
@@ -160,23 +172,29 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     @app.get("/status", response_class=HTMLResponse)
     async def status_page():
         row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
+        log_path = config.data_dir / "wiki.indexation.log"
         return _render("status.html",
             doc_count=doc_repo.count_documents(),
             chunk_count=doc_repo.count_chunks(),
             last_indexed=row["last_indexed"] if row else "never",
             watcher="enabled" if config.watch else "disabled",
             include_paths=[str(p) for p in config.include_paths],
+            data_path=str(config.index_path),
+            log_path=str(log_path),
         )
 
     @app.get("/api/status")
     async def api_status():
         row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
+        log_path = config.data_dir / "wiki.indexation.log"
         return JSONResponse({
             "documents": doc_repo.count_documents(),
             "chunks": doc_repo.count_chunks(),
             "last_indexed": row["last_indexed"] if row else None,
             "watcher": config.watch,
             "include_paths": [str(p) for p in config.include_paths],
+            "data_path": str(config.index_path),
+            "log_path": str(log_path),
         })
 
     @app.post("/api/reindex")

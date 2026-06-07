@@ -42,7 +42,7 @@ The service runs as an HTTP daemon on port 8765, providing MCP over SSE and a we
 | Variable | Default | Description |
 |----------|---------|-------------|
 | WIKI_ROOT | ./wiki | Path to markdown files |
-| WIKI_INDEX | ./.wiki-index/wiki.sqlite | SQLite index location |
+| WIKI_DATA_DIR | ./.wiki-index | Root directory for data files (DB, logs, PID) |
 | WIKI_HOST | 127.0.0.1 | HTTP bind address |
 | WIKI_PORT | 8765 | HTTP port |
 | WIKI_WATCH | true | Enable file watching |

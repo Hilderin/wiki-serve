@@ -26,8 +26,8 @@ class Indexer:
         self.doc_repo = DocumentRepository(db)
         self.chunk_repo = ChunkRepository(db)
         self.embedder = embedder
-        self._log_path = config.index_path.parent / "wiki.indexation.log"
-        config.index_path.parent.mkdir(parents=True, exist_ok=True)
+        self._log_path = config.data_dir / "wiki.indexation.log"
+        config.data_dir.mkdir(parents=True, exist_ok=True)
         self._log("STARTUP", f"Indexer initialized (paths={config.include_paths})")
 
     def _log(self, level: str, message: str) -> None:

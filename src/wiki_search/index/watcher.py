@@ -18,7 +18,10 @@ class WikiEventHandler(FileSystemEventHandler):
         self._last_event: dict[str, float] = {}
 
     def on_created(self, event):
-        if event.is_directory or not event.src_path.endswith(".md"):
+        if event.is_directory:
+            self._debounce_scan(event.src_path)
+            return
+        if not event.src_path.endswith(".md"):
             return
         self._debounce(event.src_path, "created")
 
@@ -30,17 +33,27 @@ class WikiEventHandler(FileSystemEventHandler):
     def on_deleted(self, event):
         if event.is_directory or not event.src_path.endswith(".md"):
             return
-        self.indexer.delete_file(Path(event.src_path))
+        try:
+            self.indexer.delete_file(Path(event.src_path))
+        except Exception as e:
+            print(f"[wiki-serve] ERROR deleting {event.src_path}: {e}", flush=True)
 
     def on_moved(self, event):
-        if event.is_directory or not event.src_path.endswith(".md"):
+        if event.is_directory:
             return
-        self.indexer.delete_file(Path(event.src_path))
-        if event.dest_path:
+        if event.src_path.endswith(".md"):
+            try:
+                self.indexer.delete_file(Path(event.src_path))
+            except Exception as e:
+                print(f"[wiki-serve] ERROR deleting {event.src_path}: {e}", flush=True)
+        if event.dest_path and event.dest_path.endswith(".md"):
             time.sleep(0.1)
             dest = Path(event.dest_path)
             if dest.exists():
-                self.indexer.index_file(dest)
+                try:
+                    self.indexer.index_file(dest)
+                except Exception as e:
+                    print(f"[wiki-serve] ERROR indexing {event.dest_path}: {e}", flush=True)
 
     def _debounce(self, src_path: str, _event_type: str) -> None:
         now = time.time()
@@ -51,7 +64,27 @@ class WikiEventHandler(FileSystemEventHandler):
 
         filepath = Path(src_path)
         if filepath.exists():
-            self.indexer.index_file(filepath)
+            try:
+                self.indexer.index_file(filepath)
+            except Exception as e:
+                print(f"[wiki-serve] ERROR indexing {src_path}: {e}", flush=True)
+
+    def _debounce_scan(self, dir_path: str) -> None:
+        now = time.time()
+        key = f"scan:{dir_path}"
+        last = self._last_event.get(key, 0)
+        if now - last < self.debounce_seconds:
+            return
+        self._last_event[key] = now
+
+        d = Path(dir_path)
+        if d.is_dir():
+            for fp in sorted(d.rglob("*.md")):
+                if fp.exists():
+                    try:
+                        self.indexer.index_file(fp)
+                    except Exception as e:
+                        print(f"[wiki-serve] ERROR indexing {fp}: {e}", flush=True)
 
 
 def start_watcher(config: WikiSearchConfig, indexer: Indexer) -> Observer | None:

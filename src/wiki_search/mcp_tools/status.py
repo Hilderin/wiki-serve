@@ -18,10 +18,13 @@ async def handle_status(config, db) -> list[TextContent]:
     row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
     last_indexed = row["last_indexed"] if row else None
 
+    log_path = config.data_dir / "wiki.indexation.log"
+
     text = (
         f"Include paths ({len(config.include_paths)}):\n"
         + "\n".join(f"  {p}" for p in config.include_paths)
-        + f"\nIndex: {config.index_path}\n"
+        + f"\nDatabase: {config.index_path}\n"
+        f"Log: {log_path}\n"
         f"Documents: {doc_repo.count_documents()}\n"
         f"Chunks: {doc_repo.count_chunks()}\n"
         f"Watcher: {'enabled' if config.watch else 'disabled'}\n"

@@ -13,30 +13,30 @@ from .config import WikiSearchConfig
 
 logger = logging.getLogger("wiki-serve.daemon")
 
-PID_DIR = Path(".wiki-index")
-PID_FILE = PID_DIR / "http.pid"
-LOG_FILE = PID_DIR / "http.log"
 POLL_INTERVAL = 0.2
 MAX_WAIT = 10.0
 
 
-def _get_pid() -> int | None:
-    if not PID_FILE.exists():
+def _get_pid(config: WikiSearchConfig) -> int | None:
+    pid_file = config.data_dir / "http.pid"
+    if not pid_file.exists():
         return None
     try:
-        return int(PID_FILE.read_text().strip())
+        return int(pid_file.read_text().strip())
     except (ValueError, OSError):
         return None
 
 
-def _save_pid(pid: int) -> None:
-    PID_DIR.mkdir(parents=True, exist_ok=True)
-    PID_FILE.write_text(str(pid))
+def _save_pid(config: WikiSearchConfig, pid: int) -> None:
+    pid_file = config.data_dir / "http.pid"
+    config.data_dir.mkdir(parents=True, exist_ok=True)
+    pid_file.write_text(str(pid))
 
 
-def _remove_pid() -> None:
+def _remove_pid(config: WikiSearchConfig) -> None:
+    pid_file = config.data_dir / "http.pid"
     try:
-        PID_FILE.unlink(missing_ok=True)
+        pid_file.unlink(missing_ok=True)
     except OSError:
         pass
 
@@ -65,16 +65,17 @@ async def _wait_for_health(config: WikiSearchConfig, timeout: float = MAX_WAIT) 
 
 
 def cmd_start(config: WikiSearchConfig) -> None:
-    existing = _get_pid()
+    existing = _get_pid(config)
     if existing and _is_running(existing):
         print(f"Server already running (PID {existing})")
         return
 
     print(f"Starting wiki-serve on {config.host}:{config.port}...")
-    PID_DIR.mkdir(parents=True, exist_ok=True)
+    config.data_dir.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    log_file = config.data_dir / "http.log"
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "uvicorn",
@@ -84,28 +85,28 @@ def cmd_start(config: WikiSearchConfig) -> None:
          "wiki_search.http_server:create_app",
          "--log-level", "info"],
         env=env,
-        stdout=open(LOG_FILE, "a"),
+        stdout=open(log_file, "a"),
         stderr=subprocess.STDOUT,
     )
-    _save_pid(proc.pid)
+    _save_pid(config, proc.pid)
 
     if asyncio.run(_wait_for_health(config)):
         print(f"Server started (PID {proc.pid}) — http://{config.host}:{config.port}")
     else:
         print("Server failed to start within timeout")
         proc.kill()
-        _remove_pid()
+        _remove_pid(config)
         sys.exit(1)
 
 
 def cmd_stop(config: WikiSearchConfig) -> None:
-    pid = _get_pid()
+    pid = _get_pid(config)
     if not pid:
         print("No PID file found")
         return
     if not _is_running(pid):
         print(f"Server not running (stale PID {pid})")
-        _remove_pid()
+        _remove_pid(config)
         return
     print(f"Stopping server (PID {pid})...")
     os.kill(pid, signal.SIGTERM)
@@ -113,7 +114,7 @@ def cmd_stop(config: WikiSearchConfig) -> None:
         os.waitpid(pid, 0)
     except ChildProcessError:
         pass
-    _remove_pid()
+    _remove_pid(config)
     print("Server stopped")
 
 
@@ -124,7 +125,7 @@ def cmd_restart(config: WikiSearchConfig) -> None:
 
 
 def cmd_status(config: WikiSearchConfig) -> None:
-    pid = _get_pid()
+    pid = _get_pid(config)
     if pid and _is_running(pid):
         alive = asyncio.run(_wait_for_health(config, timeout=3.0))
         if alive:
@@ -133,7 +134,7 @@ def cmd_status(config: WikiSearchConfig) -> None:
             print(f"Process exists (PID {pid}) but not responding")
     else:
         if pid:
-            _remove_pid()
+            _remove_pid(config)
         print("Server is not running")
 
 

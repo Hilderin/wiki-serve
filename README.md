@@ -45,6 +45,7 @@ Click "View section" on any result to see the full content of that section, incl
 Visit `/status` to see:
 - Document and chunk counts
 - Currently indexed paths
+- Database and log file locations
 - Last indexed timestamp
 - Reindex button
 
@@ -100,7 +101,7 @@ wiki-serve stdio              # Legacy stdio MCP server
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `WIKI_INCLUDE` | `./wiki` | Colon-separated paths (files + dirs) to index |
-| `WIKI_INDEX` | `./.wiki-index/wiki.sqlite` | SQLite index location |
+| `WIKI_DATA_DIR` | `./.wiki-index` | Root directory for data files (database, logs, PID) |
 | `WIKI_HOST` | `127.0.0.1` | HTTP bind address |
 | `WIKI_PORT` | `8765` | HTTP port |
 | `WIKI_WATCH` | `true` | Enable file watching |
