@@ -10,6 +10,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mcp.server.fastmcp import FastMCP
 
 from . import __version__
+from .mcp_tools.read_section import read_section_from_disk
 from .config import WikiSearchConfig
 from .db.connection import DatabaseManager
 from .db.schema import initialize_database
@@ -117,6 +118,15 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     @mcp.tool()
     def read_section(path: str, heading: str) -> str:
+        section = read_section_from_disk(config, path, heading)
+        if section:
+            return (
+                f"File: {path}\n"
+                f"Heading: {heading}\n"
+                f"Lines: {section['start_line']}-{section['end_line']}\n\n"
+                f"{section['content']}"
+            )
+
         chunks = chunk_repo.get_chunks_by_heading(path, heading)
         if not chunks:
             return f"Section not found: '{heading}' in '{path}'"
@@ -124,7 +134,8 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
         return (
             f"File: {path}\n"
             f"Heading: {heading}\n"
-            f"Lines: {chunks[0]['start_line']}-{chunks[-1]['end_line']}\n\n"
+            f"Lines: {chunks[0]['start_line']}-{chunks[-1]['end_line']}\n"
+            f"(partial content — file not available on disk)\n\n"
             f"{content}"
         )
 
@@ -163,6 +174,10 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     @app.get("/section", response_class=HTMLResponse)
     async def section_page(path: str = Query(default=""), heading: str = Query(default=""), q: str | None = Query(default=None)):
+        section = read_section_from_disk(config, path, heading)
+        if section:
+            return _render("section.html", path=path, heading=heading, content=section["content"], start_line=section["start_line"], end_line=section["end_line"], query=q, vscode_url=_make_vscode_url())
+
         chunks = chunk_repo.get_chunks_by_heading(path, heading)
         if not chunks:
             return _render("section.html", path=path, heading=heading, content="Section not found.", start_line=0, end_line=0, query=q, vscode_url=_make_vscode_url())

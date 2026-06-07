@@ -59,7 +59,7 @@ async def main_stdio() -> None:
         if name == "search_exact":
             return await handle_search_exact(exact, arguments)
         if name == "read_section":
-            return await handle_read_section(db, arguments)
+            return await handle_read_section(config, db, arguments)
         raise ValueError(f"Unknown tool: {name}")
 
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):
