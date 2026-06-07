@@ -3,7 +3,7 @@ from mcp.types import Tool, TextContent
 from ..search.rank import normalize_bm25_score, rerank_with_heading_boost
 
 SEARCH_WIKI_TOOL = Tool(
-    name="wiki_search",
+    name="search",
     description="Search the wiki using hybrid (FTS + semantic) search. Use for conceptual or fuzzy project questions.",
     inputSchema={
         "type": "object",
@@ -16,7 +16,7 @@ SEARCH_WIKI_TOOL = Tool(
 )
 
 SEARCH_EXACT_TOOL = Tool(
-    name="wiki_search_exact",
+    name="search_exact",
     description="Search the wiki using exact lexical/FTS search. Use for specific terms, IDs, file names, class names.",
     inputSchema={
         "type": "object",

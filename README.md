@@ -151,7 +151,7 @@ Each project gets its own daemon on a different port:
 
 ```
 opencode ──HTTP/SSE──► wiki-serve daemon (:8765)
-                            ├── MCP tools (wiki_search, wiki_read_section, …)
+                            ├── MCP tools (search, read_section, …)
                             ├── Web UI (search, section viewer)
                             └── REST API (/api/search, /api/status, …)
 
@@ -162,7 +162,7 @@ browser ──► http://localhost:8765
 
 ### Hybrid vector search
 
-When `WIKI_EMBEDDING_ENABLED=true` (default), `wiki_search` combines:
+When `WIKI_EMBEDDING_ENABLED=true` (default), `search` combines:
 - **FTS5 (BM25)** — keyword/lexical matching
 - **Vector search** — semantic similarity via `all-MiniLM-L6-v2` embeddings, stored in SQLite via `sqlite-vec`
 
@@ -172,15 +172,15 @@ Set `WIKI_EMBEDDING_ENABLED=false` to fall back to pure FTS5 (no model download,
 
 ### Exact search
 
-`wiki_search_exact` uses pure FTS5 — useful for specific terms, identifiers, class names, or file paths.
+`search_exact` uses pure FTS5 — useful for specific terms, identifiers, class names, or file paths.
 
 ## MCP tools
 
 | Tool | Description |
 |------|-------------|
-| `wiki_search` | Hybrid (FTS5 + vector) search for fuzzy/conceptual queries |
-| `wiki_search_exact` | Exact lexical search for specific terms, IDs, file names |
-| `wiki_read_section` | Read a full section by heading path |
+| `search` | Hybrid (FTS5 + vector) search for fuzzy/conceptual queries |
+| `search_exact` | Exact lexical search for specific terms, IDs, file names |
+| `read_section` | Read a full section by heading path |
 
 ## Development
 

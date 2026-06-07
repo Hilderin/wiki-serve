@@ -86,7 +86,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     mcp = FastMCP("wiki-serve")
 
     @mcp.tool()
-    def wiki_search(query: str, limit: int = 10) -> str:
+    def search(query: str, limit: int = 10) -> str:
         results = hybrid.search(query, limit)
         for r in results:
             if "bm25" in r:
@@ -101,7 +101,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
         return "\n".join(lines)
 
     @mcp.tool()
-    def wiki_search_exact(query: str, limit: int = 10) -> str:
+    def search_exact(query: str, limit: int = 10) -> str:
         results = exact.search(query, limit)
         for r in results:
             bm25 = r.pop("bm25", 0)
@@ -116,7 +116,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
         return "\n".join(lines)
 
     @mcp.tool()
-    def wiki_read_section(path: str, heading: str) -> str:
+    def read_section(path: str, heading: str) -> str:
         chunks = chunk_repo.get_chunks_by_heading(path, heading)
         if not chunks:
             return f"Section not found: '{heading}' in '{path}'"

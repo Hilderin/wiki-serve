@@ -3,7 +3,7 @@ from mcp.types import Tool, TextContent
 from ..db.repository import ChunkRepository
 
 READ_SECTION_TOOL = Tool(
-    name="wiki_read_section",
+    name="read_section",
     description="Read a specific section from a wiki file by path and heading path.",
     inputSchema={
         "type": "object",

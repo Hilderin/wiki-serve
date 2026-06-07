@@ -3,7 +3,7 @@ from mcp.types import Tool, TextContent
 from ..db.repository import DocumentRepository
 
 STATUS_TOOL = Tool(
-    name="wiki_status",
+    name="status",
     description="Return the status of the wiki index.",
     inputSchema={
         "type": "object",

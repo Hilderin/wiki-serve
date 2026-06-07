@@ -1,7 +1,7 @@
 from mcp.types import Tool, TextContent
 
 REINDEX_TOOL = Tool(
-    name="wiki_reindex",
+    name="reindex",
     description="Force reindexing of the wiki.",
     inputSchema={
         "type": "object",

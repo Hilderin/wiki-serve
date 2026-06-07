@@ -54,11 +54,11 @@ async def main_stdio() -> None:
 
     @server.call_tool()
     async def handle_call_tool(name: str, arguments: dict) -> list[types.TextContent]:
-        if name == "wiki_search":
+        if name == "search":
             return await handle_search(hybrid, arguments)
-        if name == "wiki_search_exact":
+        if name == "search_exact":
             return await handle_search_exact(exact, arguments)
-        if name == "wiki_read_section":
+        if name == "read_section":
             return await handle_read_section(db, arguments)
         raise ValueError(f"Unknown tool: {name}")
 
