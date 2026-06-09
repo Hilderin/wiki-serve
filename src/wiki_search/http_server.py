@@ -13,7 +13,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mcp.server.fastmcp import FastMCP
 
 from . import __version__
-from .mcp_tools.read_section import read_section_from_disk
+from .mcp_tools.read_section import read_section_from_disk, _resolve_file
 from .config import WikiSearchConfig
 from .db.connection import DatabaseManager
 from .db.schema import initialize_database
@@ -225,6 +225,15 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
         raw = "\n".join(c["content"] for c in chunks)
         html_content = _render_md(raw)
         return _render("section.html", path=path, heading=heading, content=html_content, start_line=chunks[0]["start_line"], end_line=chunks[-1]["end_line"], query=q, vscode_url=_make_vscode_url())
+
+    @app.get("/document", response_class=HTMLResponse)
+    async def document_page(path: str = Query(default=""), q: str | None = Query(default=None)):
+        filepath = await asyncio.to_thread(_resolve_file, config, path)
+        if not filepath:
+            return _render("document.html", path=path, content="<p>Document not found.</p>", query=q, vscode_url=_make_vscode_url())
+        raw = await asyncio.to_thread(filepath.read_text, "utf-8")
+        html_content = _render_md(raw)
+        return _render("document.html", path=path, content=html_content, query=q, vscode_url=_make_vscode_url())
 
     @app.get("/status", response_class=HTMLResponse)
     async def status_page():

@@ -126,18 +126,29 @@ header nav a:hover {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.result-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1a1a;
+  text-decoration: none;
+}
+
+.result-title:hover {
+  color: #4a90d9;
 }
 
 .result-path {
   font-size: 12px;
-  color: #4a90d9;
+  color: #999;
   text-decoration: none;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
 .result-path:hover {
-  text-decoration: underline;
+  color: #4a90d9;
 }
 
 .result-heading {
@@ -156,6 +167,10 @@ header nav a:hover {
   color: #444;
   line-height: 1.5;
   margin-top: 6px;
+}
+
+.result-footer {
+  margin-top: 8px;
 }
 
 mark {
@@ -197,6 +212,46 @@ mark {
   font-size: 12px;
   color: #999;
   margin-top: 4px;
+}
+
+.section-links {
+  margin-top: 10px;
+  display: flex;
+  gap: 12px;
+}
+
+.section-link {
+  font-size: 13px;
+  color: #4a90d9;
+  text-decoration: none;
+}
+
+.section-link:hover {
+  text-decoration: underline;
+}
+
+.document-viewer {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 24px;
+}
+
+.document-meta {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.document-path {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.document-links {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
 }
 
 .section-content {

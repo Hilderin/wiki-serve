@@ -12,6 +12,10 @@
     <div class="heading">{{ heading }}</div>
     {% endif %}
     <div class="lines">Lines {{ start_line }}–{{ end_line }}</div>
+    <div class="section-links">
+      <a href="/document?path={{ path|urlencode }}{% if query %}&q={{ query|urlencode }}{% endif %}" class="section-link">View full content</a>
+      <a href="{{ vscode_url(path, start_line) }}" class="section-link">Open in VSCode</a>
+    </div>
   </div>
   <div class="section-content markdown-body">{{ content|safe }}</div>
 </div>

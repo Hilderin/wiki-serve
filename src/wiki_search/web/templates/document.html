@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+
+{% block title %}{{ path }} - Wiki Serve{% endblock %}
+
+{% block content %}
+<a href="/?q={{ query|urlencode if query else '' }}" style="font-size:13px;color:#4a90d9;text-decoration:none;display:inline-block;margin-bottom:16px">← Back to search</a>
+
+<div class="document-viewer">
+  <div class="document-meta">
+    <div class="document-path">{{ path }}</div>
+    <div class="document-links">
+      <a href="{{ vscode_url(path, 1) }}" class="section-link">Open in VSCode</a>
+    </div>
+  </div>
+  <div class="section-content markdown-body">{{ content|safe }}</div>
+</div>
+{% endblock %}
