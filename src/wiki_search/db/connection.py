@@ -1,4 +1,6 @@
 import sqlite3
+import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -6,8 +8,14 @@ class DatabaseManager:
     def __init__(self, db_path: Path):
         self.db_path = db_path
         self._conn: sqlite3.Connection | None = None
+        self.lock = threading.Lock()
 
     vec_available: bool = False
+
+    @contextmanager
+    def access(self):
+        with self.lock:
+            yield self.conn
 
     @property
     def conn(self) -> sqlite3.Connection:

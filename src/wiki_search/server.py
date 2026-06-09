@@ -1,6 +1,7 @@
 import asyncio
 import sys
 import threading
+import traceback
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
@@ -40,7 +41,7 @@ async def main_stdio() -> None:
                 count = indexer.reindex_changed_only()
                 print(f"[wiki-serve] Indexed {count} files on startup", file=sys.stderr)
             except Exception:
-                print("[wiki-serve] Reindexing failed.", file=sys.stderr)
+                print(f"[wiki-serve] Reindexing failed:\n{traceback.format_exc()}", file=sys.stderr)
             finally:
                 reindex_done.set()
 

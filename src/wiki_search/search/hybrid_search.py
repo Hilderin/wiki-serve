@@ -15,11 +15,13 @@ class HybridSearcher:
         if not query.strip():
             return []
 
-        fts_results = self.exact.search(query, limit * 2)
+        with self.db.access():
+            fts_results = self.exact.search(query, limit * 2)
 
         if self.embedder is not None:
             query_vec = self.embedder.embed(query)
-            vec_results = self.chunk_repo.search_vector(query_vec, limit * 2)
+            with self.db.access():
+                vec_results = self.chunk_repo.search_vector(query_vec, limit * 2)
             return rrf_fuse(fts_results, vec_results, limit)
         else:
             return fts_results

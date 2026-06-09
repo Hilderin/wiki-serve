@@ -9,4 +9,5 @@ class ExactSearcher:
     def search(self, query: str, limit: int = 10) -> list[dict]:
         if not query.strip():
             return []
-        return self.chunk_repo.search_fts(query, limit)
+        with self.db.access():
+            return self.chunk_repo.search_fts(query, limit)

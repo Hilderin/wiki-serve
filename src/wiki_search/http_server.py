@@ -1,5 +1,6 @@
 import sys
 import threading
+import traceback
 from pathlib import Path
 
 import anyio
@@ -88,7 +89,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
                 indexer.reindex_changed_only()
                 print("[wiki-serve] Reindexing complete.", flush=True)
             except Exception:
-                print("[wiki-serve] Reindexing failed.", flush=True)
+                print(f"[wiki-serve] Reindexing failed:\n{traceback.format_exc()}", flush=True)
             finally:
                 _reindexing.clear()
 
@@ -198,7 +199,8 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
         if section:
             return _render("section.html", path=path, heading=heading, content=section["content"], start_line=section["start_line"], end_line=section["end_line"], query=q, vscode_url=_make_vscode_url())
 
-        chunks = chunk_repo.get_chunks_by_heading(path, heading)
+        with db.access():
+            chunks = chunk_repo.get_chunks_by_heading(path, heading)
         if not chunks:
             return _render("section.html", path=path, heading=heading, content="Section not found.", start_line=0, end_line=0, query=q, vscode_url=_make_vscode_url())
         content = "\n".join(c["content"] for c in chunks)
@@ -206,11 +208,14 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     @app.get("/status", response_class=HTMLResponse)
     async def status_page():
-        row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
+        with db.access():
+            row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
+            doc_count = doc_repo.count_documents()
+            chunk_count = doc_repo.count_chunks()
         log_path = config.data_dir / "wiki.indexation.log"
         return _render("status.html",
-            doc_count=doc_repo.count_documents(),
-            chunk_count=doc_repo.count_chunks(),
+            doc_count=doc_count,
+            chunk_count=chunk_count,
             last_indexed=row["last_indexed"] if row else "never",
             reindexing=_reindexing.is_set(),
             watcher="enabled" if config.watch else "disabled",
@@ -222,11 +227,14 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     @app.get("/api/status")
     async def api_status():
-        row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
+        with db.access():
+            row = db.conn.execute("SELECT MAX(indexed_at) as last_indexed FROM documents").fetchone()
+            doc_count = doc_repo.count_documents()
+            chunk_count = doc_repo.count_chunks()
         log_path = config.data_dir / "wiki.indexation.log"
         return JSONResponse({
-            "documents": doc_repo.count_documents(),
-            "chunks": doc_repo.count_chunks(),
+            "documents": doc_count,
+            "chunks": chunk_count,
             "last_indexed": row["last_indexed"] if row else None,
             "reindexing": _reindexing.is_set(),
             "watcher": config.watch,
