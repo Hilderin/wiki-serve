@@ -1,5 +1,4 @@
 import hashlib
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -40,7 +39,7 @@ class Indexer:
                 f.write(line + "\n")
         except OSError:
             pass
-        if level in ("INDEXING", "VECTORS", "INDEXED", "VECTORED", "DELETED", "REINDEX", "REBUILD", "STARTUP", "UP-TO-DATE", "WARNING", "ERROR"):
+        if level in ("INDEXING", "VECTORS", "INDEXED", "VECTORED", "DELETED", "REMOVED", "SKIPPED", "REINDEX", "REBUILD", "STARTUP", "UP-TO-DATE", "WARNING", "ERROR"):
             print(f"[wiki-serve] {line}", flush=True)
 
     def index_file(self, filepath: Path) -> bool:
@@ -89,18 +88,17 @@ class Indexer:
             doc_id = self.doc_repo.upsert_document(path_str, title, content_hash, mtime, size)
             self.chunk_repo.delete_chunks_for_document(doc_id)
 
-        chunks = chunker.chunk_file(filepath)
-        embed_texts = []
-        for ch in chunks:
-            ch["path"] = path_str
-            if not ch["heading_path"]:
-                ch["heading_path"] = title or path_str
-                ch["heading_level"] = 0
+            chunks = chunker.chunk_content(path_str, content.split("\n"))
+            embed_texts = []
+            for ch in chunks:
+                ch["path"] = path_str
+                if not ch["heading_path"]:
+                    ch["heading_path"] = title or path_str
+                    ch["heading_level"] = 0
 
-        if self.embedder is not None:
-            embed_texts = [ch["content"] for ch in chunks]
+            if self.embedder is not None:
+                embed_texts = [ch["content"] for ch in chunks]
 
-        with self.db.lock:
             for ch in chunks:
                 chunk_id = self.chunk_repo.insert_chunk(
                     doc_id, ch["path"], ch["heading_path"],
@@ -125,12 +123,30 @@ class Indexer:
             self.db.conn.commit()
         self._log("DELETED", path_str)
 
-    _SKIP_DIRS = frozenset(s.lower() for s in {"node_modules", ".git", ".venv", "__pycache__", "tmp", "temp"})
+    def delete_directory(self, dirpath: Path) -> int:
+        prefix = rel_path(dirpath)
+        with self.db.lock:
+            count = self.doc_repo.delete_documents_by_prefix(prefix)
+            if count:
+                self.db.conn.commit()
+        if count:
+            self._log("REMOVED", f"Deleted directory ({count} documents): {prefix}")
+        return count
 
-    def _should_skip(self, path: Path) -> bool:
-        if path.name in self._SKIP_FILES:
+    _SKIP_DIRS = frozenset(s.lower() for s in {"node_modules", ".git", ".venv", "__pycache__", "tmp", "temp"})
+    _SKIP_FILES = frozenset(s.lower() for s in {".ds_store", "thumbs.db", "desktop.ini", "agents.md"})
+
+    def _should_skip(self, path: Path, root: Path | None = None) -> bool:
+        if path.name.lower() in self._SKIP_FILES:
             return True
-        for part in path.parts:
+        if root is not None:
+            try:
+                check = path.resolve().relative_to(root.resolve()).parts
+            except ValueError:
+                check = path.parts
+        else:
+            check = path.parts
+        for part in check:
             if part.lower() in self._SKIP_DIRS or part.startswith("."):
                 return True
         return False
@@ -143,7 +159,7 @@ class Indexer:
                 if p.suffix == ".md" and not self._should_skip(p):
                     files.append(p)
             elif p.is_dir():
-                files.extend(f for f in sorted(p.rglob("*.md")) if not self._should_skip(f))
+                files.extend(f for f in sorted(p.rglob("*.md")) if not self._should_skip(f, root=p))
         return files
 
     def reindex_changed_only(self) -> int:
@@ -165,16 +181,43 @@ class Indexer:
                 self._log("ERROR", f"Failed to index {filepath}: {exc}")
 
         indexed_set = {rel_path(f) for f in md_files}
+        removed_count = 0
+        skipped_count = 0
         for doc in self.doc_repo.get_all_documents():
-            if doc["path"] not in indexed_set:
+            if doc["path"] in indexed_set:
+                continue
+            doc_path = _cwd / doc["path"]
+            doc_root = None
+            for ip in self.config.include_paths:
+                try:
+                    doc_path.resolve().relative_to(ip.resolve())
+                    doc_root = ip.resolve()
+                    break
+                except ValueError:
+                    continue
+            if doc_path.exists() and self._should_skip(doc_path, root=doc_root):
+                self._log("SKIPPED", f"Removing skipped document: {doc['path']}")
+                skipped_count += 1
+            elif not doc_path.exists():
+                self._log("REMOVED", f"Removing deleted document: {doc['path']}")
+                removed_count += 1
+            else:
                 self._log("STALE", f"Removing stale document: {doc['path']}")
-                self.doc_repo.delete_document(doc["path"])
+            self.doc_repo.delete_document(doc["path"])
 
         self.db.conn.commit()
+        removed_summary = ""
+        if removed_count or skipped_count:
+            parts = []
+            if removed_count:
+                parts.append(f"{removed_count} removed")
+            if skipped_count:
+                parts.append(f"{skipped_count} skipped")
+            removed_summary = f", {', '.join(parts)}"
         if errors:
-            self._log("REINDEX", f"Completed: {len(md_files)} files scanned, {count} reindexed, {errors} errors")
+            self._log("REINDEX", f"Completed: {len(md_files)} files scanned, {count} reindexed{removed_summary}, {errors} errors")
         else:
-            self._log("REINDEX", f"Completed: {len(md_files)} files scanned, {count} reindexed")
+            self._log("REINDEX", f"Completed: {len(md_files)} files scanned, {count} reindexed{removed_summary}")
         return count
 
     def rebuild(self) -> int:

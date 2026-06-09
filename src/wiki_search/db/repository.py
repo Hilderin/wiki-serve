@@ -32,6 +32,35 @@ class DocumentRepository:
             conn.execute("DELETE FROM chunks WHERE document_id = ?", (doc["id"],))
             conn.execute("DELETE FROM documents WHERE id = ?", (doc["id"],))
 
+    def delete_documents_by_prefix(self, prefix: str) -> int:
+        conn = self.db.conn
+        norm_prefix = prefix.replace("\\", "/").rstrip("/") + "/"
+        docs = conn.execute(
+            "SELECT id, path FROM documents"
+        ).fetchall()
+        matching = [d["id"] for d in docs if d["path"].replace("\\", "/").startswith(norm_prefix)]
+        if not matching:
+            return 0
+        placeholders = ",".join("?" * len(matching))
+        if self.db.vec_available:
+            conn.execute(
+                f"DELETE FROM chunks_vectors WHERE chunk_id IN (SELECT id FROM chunks WHERE document_id IN ({placeholders}))",
+                matching,
+            )
+        conn.execute(
+            f"DELETE FROM chunks_fts WHERE rowid IN (SELECT id FROM chunks WHERE document_id IN ({placeholders}))",
+            matching,
+        )
+        conn.execute(
+            f"DELETE FROM chunks WHERE document_id IN ({placeholders})",
+            matching,
+        )
+        conn.execute(
+            f"DELETE FROM documents WHERE id IN ({placeholders})",
+            matching,
+        )
+        return len(matching)
+
     def get_document_by_path(self, path: str) -> dict[str, Any] | None:
         row = self.db.conn.execute(
             "SELECT * FROM documents WHERE path = ?", (path,)

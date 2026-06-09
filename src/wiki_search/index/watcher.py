@@ -23,15 +23,28 @@ class WikiEventHandler(FileSystemEventHandler):
             return
         if not event.src_path.endswith(".md"):
             return
+        filepath = Path(event.src_path)
+        if self.indexer._should_skip(filepath):
+            return
         self._debounce(event.src_path, "created")
 
     def on_modified(self, event):
         if event.is_directory or not event.src_path.endswith(".md"):
             return
+        filepath = Path(event.src_path)
+        if self.indexer._should_skip(filepath):
+            return
         self._debounce(event.src_path, "modified")
 
     def on_deleted(self, event):
-        if event.is_directory or not event.src_path.endswith(".md"):
+        if event.is_directory:
+            dirpath = Path(event.src_path)
+            try:
+                self.indexer.delete_directory(dirpath)
+            except Exception as e:
+                print(f"[wiki-serve] ERROR deleting directory {event.src_path}: {e}", flush=True)
+            return
+        if not event.src_path.endswith(".md"):
             return
         try:
             self.indexer.delete_file(Path(event.src_path))
@@ -40,6 +53,16 @@ class WikiEventHandler(FileSystemEventHandler):
 
     def on_moved(self, event):
         if event.is_directory:
+            src = Path(event.src_path)
+            try:
+                self.indexer.delete_directory(src)
+            except Exception as e:
+                print(f"[wiki-serve] ERROR deleting directory {event.src_path}: {e}", flush=True)
+            if event.dest_path:
+                dest = Path(event.dest_path)
+                if self.indexer._should_skip(dest):
+                    return
+                self._debounce_scan(event.dest_path)
             return
         if event.src_path.endswith(".md"):
             try:
@@ -47,8 +70,10 @@ class WikiEventHandler(FileSystemEventHandler):
             except Exception as e:
                 print(f"[wiki-serve] ERROR deleting {event.src_path}: {e}", flush=True)
         if event.dest_path and event.dest_path.endswith(".md"):
-            time.sleep(0.1)
             dest = Path(event.dest_path)
+            if self.indexer._should_skip(dest):
+                return
+            time.sleep(0.1)
             if dest.exists():
                 try:
                     self.indexer.index_file(dest)
@@ -80,6 +105,8 @@ class WikiEventHandler(FileSystemEventHandler):
         d = Path(dir_path)
         if d.is_dir():
             for fp in sorted(d.rglob("*.md")):
+                if self.indexer._should_skip(fp):
+                    continue
                 if fp.exists():
                     try:
                         self.indexer.index_file(fp)
