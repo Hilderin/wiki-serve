@@ -22,6 +22,7 @@ from .mcp_tools.search_wiki import (
     handle_search_exact,
 )
 from .mcp_tools.read_section import READ_SECTION_TOOL, handle_read_section
+from .mcp_tools.read_document import READ_DOCUMENT_TOOL, handle_read_document
 
 
 async def main_stdio() -> None:
@@ -62,6 +63,7 @@ async def main_stdio() -> None:
             SEARCH_WIKI_TOOL,
             SEARCH_EXACT_TOOL,
             READ_SECTION_TOOL,
+            READ_DOCUMENT_TOOL,
         ]
 
     @server.call_tool()
@@ -72,6 +74,8 @@ async def main_stdio() -> None:
             return await handle_search_exact(exact, arguments)
         if name == "read_section":
             return await handle_read_section(config, db, arguments)
+        if name == "read_document":
+            return await handle_read_document(config, arguments)
         raise ValueError(f"Unknown tool: {name}")
 
     async with mcp.server.stdio.stdio_server() as (read_stream, write_stream):

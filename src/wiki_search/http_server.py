@@ -13,7 +13,9 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 from mcp.server.fastmcp import FastMCP
 
 from . import __version__
-from .mcp_tools.read_section import read_section_from_disk, _resolve_file
+from .mcp_tools.read_section import read_section_from_disk
+from .mcp_tools.read_document import read_document_from_disk
+from .mcp_tools.utils import _resolve_file
 from .config import WikiSearchConfig
 from .db.connection import DatabaseManager
 from .db.schema import initialize_database
@@ -176,6 +178,17 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
             f"Lines: {chunks[0]['start_line']}-{chunks[-1]['end_line']}\n"
             f"(partial content — file not available on disk)\n\n"
             f"{content}"
+        )
+
+    @mcp.tool()
+    def read_document(path: str) -> str:
+        doc = read_document_from_disk(config, path)
+        if not doc:
+            return f"Document not found: '{path}'"
+        return (
+            f"File: {path}\n"
+            f"Lines: 1-{doc['line_count']}\n\n"
+            f"{doc['content']}"
         )
 
     app = FastAPI(title="Wiki Serve", version=__version__)
