@@ -1,6 +1,24 @@
 import pytest
 
 from wiki_search.index.indexer import rel_path
+from wiki_search.db.connection import DatabaseManager
+
+_vec_available = None
+
+def _check_vec():
+    global _vec_available
+    if _vec_available is None:
+        import sqlite3
+        conn = sqlite3.connect(":memory:")
+        try:
+            import sqlite_vec
+            sqlite_vec.load(conn)
+            _vec_available = True
+        except Exception:
+            _vec_available = False
+        finally:
+            conn.close()
+    return _vec_available
 
 
 def test_search_empty(wiki_dir, indexer, searcher):
@@ -34,6 +52,7 @@ def test_hybrid_search_basic(wiki_dir, indexer, hybrid_searcher):
     assert results[0]["score"] >= 0
 
 
+@pytest.mark.skipif(not _check_vec(), reason="sqlite-vec not available")
 def test_missing_embeddings_are_rebuilt(wiki_dir, indexer, hybrid_searcher, db):
     filepath = wiki_dir / "doc.md"
     filepath.write_text("# Document\n\nImportant content about agents.\n")

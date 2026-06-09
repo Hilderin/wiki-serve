@@ -53,25 +53,25 @@ Visit `/status` to see:
 
 ## Indexing multiple paths
 
-`WIKI_INCLUDE` accepts a colon-separated (`:`) list of file and directory paths.
+`WIKI_INCLUDE` accepts a semicolon-separated (`;`) list of file and directory paths.
 
 ### Examples
 
 ```bash
 # Multiple directories
-WIKI_INCLUDE="./wiki:./docs:./adr"
+WIKI_INCLUDE="./wiki;./docs;./adr"
 
 # Directory + single file
-WIKI_INCLUDE="./docs:/home/user/project/README.md"
+WIKI_INCLUDE="./docs;/home/user/project/README.md"
 
 # Absolute paths
-WIKI_INCLUDE="/home/user/project-a/docs:/home/user/project-b/docs"
+WIKI_INCLUDE="/home/user/project-a/docs;/home/user/project-b/docs"
 
 # Single file only
 WIKI_INCLUDE="/home/user/project/CONTRIBUTING.md"
 
 # Mix of files and directories from different projects
-WIKI_INCLUDE="/project-a/docs:/project-a/CHANGELOG.md:/project-b/README.md"
+WIKI_INCLUDE="/project-a/docs;/project-a/CHANGELOG.md;/project-b/README.md"
 ```
 
 ### How it works
@@ -100,7 +100,7 @@ wiki-serve stdio              # Legacy stdio MCP server
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `WIKI_INCLUDE` | `./wiki` | Colon-separated paths (files + dirs) to index |
+| `WIKI_INCLUDE` | `./wiki` | Semicolon-separated paths (files + dirs) to index |
 | `WIKI_DATA_DIR` | `./.wiki-index` | Root directory for data files (database, logs, PID) |
 | `WIKI_HOST` | `127.0.0.1` | HTTP bind address |
 | `WIKI_PORT` | `8765` | HTTP port |

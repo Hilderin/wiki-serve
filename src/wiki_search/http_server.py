@@ -1,4 +1,5 @@
 import sys
+import threading
 from pathlib import Path
 
 import anyio
@@ -67,13 +68,32 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     db = DatabaseManager(config.index_path)
     initialize_database(db)
+    print(f"[wiki-serve] Database initialized (vec_available={db.vec_available})", flush=True)
 
     embedder = Embedder(config.embedding_model, config.embedding_device) if config.embedding_enabled else None
     if embedder is not None:
-        embedder.load()
+        if not db.vec_available:
+            print("[wiki-serve] WARNING: sqlite-vec not available, embeddings disabled (install sqlite-vec for vector search)", flush=True)
+            embedder = None
+        else:
+            embedder.load()
+    print(f"[wiki-serve] Embeddings: {'enabled' if embedder else 'disabled'}", flush=True)
     indexer = Indexer(db, config, embedder=embedder)
+    _reindexing = threading.Event()
     if config.reindex_on_start:
-        indexer.reindex_changed_only()
+        print("[wiki-serve] Reindexing changed files in background...", flush=True)
+
+        def _bg_reindex():
+            try:
+                indexer.reindex_changed_only()
+                print("[wiki-serve] Reindexing complete.", flush=True)
+            except Exception:
+                print("[wiki-serve] Reindexing failed.", flush=True)
+            finally:
+                _reindexing.clear()
+
+        _reindexing.set()
+        threading.Thread(target=_bg_reindex, daemon=True).start()
 
     observer = None
     if config.watch:
@@ -192,8 +212,10 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
             doc_count=doc_repo.count_documents(),
             chunk_count=doc_repo.count_chunks(),
             last_indexed=row["last_indexed"] if row else "never",
+            reindexing=_reindexing.is_set(),
             watcher="enabled" if config.watch else "disabled",
             include_paths=[str(p) for p in config.include_paths],
+            skipped_paths=[str(p) for p in config.skipped_paths],
             data_path=str(config.index_path),
             log_path=str(log_path),
         )
@@ -206,8 +228,10 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
             "documents": doc_repo.count_documents(),
             "chunks": doc_repo.count_chunks(),
             "last_indexed": row["last_indexed"] if row else None,
+            "reindexing": _reindexing.is_set(),
             "watcher": config.watch,
             "include_paths": [str(p) for p in config.include_paths],
+            "skipped_paths": [str(p) for p in config.skipped_paths],
             "data_path": str(config.index_path),
             "log_path": str(log_path),
         })

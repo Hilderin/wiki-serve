@@ -14,7 +14,9 @@ class Embedder:
         if self._model is not None:
             return
         from sentence_transformers import SentenceTransformer
+        print(f"[wiki-serve] Loading embedding model '{self._model_name}' (this may download on first run)...", flush=True)
         self._model = SentenceTransformer(self._model_name, device=self._device)
+        print(f"[wiki-serve] Embedding model loaded.", flush=True)
 
     def load(self) -> None:
         self._load_model()

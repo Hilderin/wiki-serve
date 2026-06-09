@@ -7,6 +7,8 @@ class DatabaseManager:
         self.db_path = db_path
         self._conn: sqlite3.Connection | None = None
 
+    vec_available: bool = False
+
     @property
     def conn(self) -> sqlite3.Connection:
         if self._conn is None:
@@ -21,8 +23,9 @@ class DatabaseManager:
         try:
             import sqlite_vec
             sqlite_vec.load(self._conn)
+            self.vec_available = True
         except Exception:
-            pass
+            self.vec_available = False
 
     def close(self) -> None:
         if self._conn:

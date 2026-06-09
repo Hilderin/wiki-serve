@@ -1,14 +1,16 @@
 import os
+import sys
 from pathlib import Path
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
 class WikiSearchConfig:
     include_paths: list[Path]
-    index_path: Path
-    watch: bool
-    reindex_on_start: bool
+    skipped_paths: list[Path] = field(default_factory=list)
+    index_path: Path = Path("./.wiki-index/wiki.sqlite").resolve()
+    watch: bool = True
+    reindex_on_start: bool = True
     host: str = "127.0.0.1"
     port: int = 8765
     embedding_enabled: bool = True
@@ -19,13 +21,24 @@ class WikiSearchConfig:
     def from_env(cls) -> "WikiSearchConfig":
         raw = os.environ.get("WIKI_INCLUDE", "").strip()
         if raw:
-            paths = [Path(p.strip()).resolve() for p in raw.split(":") if p.strip()]
+            all_paths = [Path(p.strip()).resolve() for p in raw.split(";") if p.strip()]
         else:
-            paths = [Path(os.environ.get("WIKI_ROOT", "./wiki")).resolve()]
+            all_paths = [Path(os.environ.get("WIKI_ROOT", "./wiki")).resolve()]
+
+        valid_paths: list[Path] = []
+        skipped_paths: list[Path] = []
+        for p in all_paths:
+            if p.exists():
+                valid_paths.append(p)
+            else:
+                skipped_paths.append(p)
+                msg = f"[wiki-serve] WARNING: Include path does not exist, skipping: {p}"
+                print(msg, file=sys.stderr, flush=True)
 
         data_dir = Path(os.environ.get("WIKI_DATA_DIR", "./.wiki-index")).resolve()
         return cls(
-            include_paths=paths,
+            include_paths=valid_paths,
+            skipped_paths=skipped_paths,
             index_path=(data_dir / "wiki.sqlite").resolve(),
             watch=os.environ.get("WIKI_WATCH", "true").lower() in ("true", "1", "yes"),
             reindex_on_start=os.environ.get("WIKI_REINDEX_ON_START", "true").lower() in ("true", "1", "yes"),

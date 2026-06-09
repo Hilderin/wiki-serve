@@ -23,7 +23,14 @@ async def handle_status(config, db) -> list[TextContent]:
     text = (
         f"Include paths ({len(config.include_paths)}):\n"
         + "\n".join(f"  {p}" for p in config.include_paths)
-        + f"\nDatabase: {config.index_path}\n"
+    )
+    if config.skipped_paths:
+        text += (
+            f"\nSkipped paths ({len(config.skipped_paths)}):\n"
+            + "\n".join(f"  {p}" for p in config.skipped_paths)
+        )
+    text += (
+        f"\nDatabase: {config.index_path}\n"
         f"Log: {log_path}\n"
         f"Documents: {doc_repo.count_documents()}\n"
         f"Chunks: {doc_repo.count_chunks()}\n"

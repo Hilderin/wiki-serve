@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import threading
 
 from mcp.server import Server
 from mcp.server.models import InitializationOptions
@@ -32,8 +33,18 @@ async def main_stdio() -> None:
     indexer = Indexer(db, config)
 
     if config.reindex_on_start:
-        count = indexer.reindex_changed_only()
-        print(f"[wiki-serve] Indexed {count} files on startup", file=sys.stderr)
+        reindex_done = asyncio.Event()
+
+        def _bg_reindex():
+            try:
+                count = indexer.reindex_changed_only()
+                print(f"[wiki-serve] Indexed {count} files on startup", file=sys.stderr)
+            except Exception:
+                print("[wiki-serve] Reindexing failed.", file=sys.stderr)
+            finally:
+                reindex_done.set()
+
+        threading.Thread(target=_bg_reindex, daemon=True).start()
 
     if config.watch:
         observer = await start_watcher(config, indexer)

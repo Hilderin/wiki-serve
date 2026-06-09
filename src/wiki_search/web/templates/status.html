@@ -18,6 +18,10 @@
     <div class="value">{{ watcher }}</div>
     <div class="label">File Watcher</div>
   </div>
+  <div class="status-card">
+    <div class="value" style="color:{% if reindexing %}#e67e22{% else %}#27ae60{% endif %}">{% if reindexing %}In Progress{% else %}Idle{% endif %}</div>
+    <div class="label">Reindexing</div>
+  </div>
 </div>
 
 <div style="margin-top:20px;font-size:13px;color:#666">
@@ -27,6 +31,14 @@
     <li><code>{{ p }}</code></li>
   {% endfor %}
   </ul>
+  {% if skipped_paths %}
+  <p style="margin-top:8px;color:#c0392b">Skipped paths (not found):</p>
+  <ul style="margin-top:4px;margin-left:16px;color:#c0392b">
+  {% for p in skipped_paths %}
+    <li><code>{{ p }}</code></li>
+  {% endfor %}
+  </ul>
+  {% endif %}
   <p style="margin-top:8px">Database: <code>{{ data_path }}</code></p>
   <p>Log: <code>{{ log_path }}</code></p>
   <p style="margin-top:8px">Last indexed: <code>{{ last_indexed }}</code></p>

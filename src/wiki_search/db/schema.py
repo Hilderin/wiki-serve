@@ -28,6 +28,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
     path
 );
 
+"""
+
+
+VEC_SCHEMA_SQL = """
 CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vectors USING vec0(
     chunk_id INTEGER PRIMARY KEY,
     embedding FLOAT[384]
@@ -37,4 +41,6 @@ CREATE VIRTUAL TABLE IF NOT EXISTS chunks_vectors USING vec0(
 
 def initialize_database(db) -> None:
     db.conn.executescript(SCHEMA_SQL)
+    if db.vec_available:
+        db.conn.executescript(VEC_SCHEMA_SQL)
     db.conn.commit()
