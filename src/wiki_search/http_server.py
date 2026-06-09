@@ -1,3 +1,4 @@
+import asyncio
 import sys
 import threading
 import traceback
@@ -178,7 +179,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     async def index_page(q: str | None = Query(default=None)):
         results_data = []
         if q:
-            raw = hybrid.search(q)
+            raw = await asyncio.to_thread(hybrid.search, q)
             for r in raw:
                 results_data.append(_format_search_result(r))
             results_data = rerank_with_heading_boost(results_data, q)
@@ -188,7 +189,7 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     async def api_search(q: str = Query(default=""), limit: int = Query(default=20)):
         if not q.strip():
             return JSONResponse({"results": []})
-        raw = hybrid.search(q, limit)
+        raw = await asyncio.to_thread(hybrid.search, q, limit)
         results = [_format_search_result(r) for r in raw]
         results = rerank_with_heading_boost(results, q)
         return JSONResponse({"query": q, "results": results})
@@ -246,11 +247,23 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
 
     @app.post("/api/reindex")
     async def api_reindex(mode: str = Query(default="changed-only")):
-        if mode == "rebuild":
-            count = indexer.rebuild()
-            return JSONResponse({"status": "ok", "message": f"Rebuilt index: {count} files indexed"})
-        count = indexer.reindex_changed_only()
-        return JSONResponse({"status": "ok", "message": f"Reindexed {count} files"})
+        if _reindexing.is_set():
+            return JSONResponse({"status": "already_running", "message": "Reindexing is already in progress"}, status_code=409)
+
+        def _run():
+            try:
+                if mode == "rebuild":
+                    indexer.rebuild()
+                else:
+                    indexer.reindex_changed_only()
+            except Exception:
+                print(f"[wiki-serve] Reindex failed:\n{traceback.format_exc()}", flush=True)
+            finally:
+                _reindexing.clear()
+
+        _reindexing.set()
+        threading.Thread(target=_run, daemon=True).start()
+        return JSONResponse({"status": "started", "message": f"Reindex ({mode}) started in background"})
 
     @app.get("/health")
     async def health():

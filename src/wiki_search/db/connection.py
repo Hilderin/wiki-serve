@@ -8,7 +8,7 @@ class DatabaseManager:
     def __init__(self, db_path: Path):
         self.db_path = db_path
         self._conn: sqlite3.Connection | None = None
-        self.lock = threading.Lock()
+        self.lock = threading.RLock()
 
     vec_available: bool = False
 

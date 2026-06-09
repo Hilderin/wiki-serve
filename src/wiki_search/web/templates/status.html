@@ -56,10 +56,27 @@ document.getElementById('reindexBtn').addEventListener('click', async () => {
   try {
     const r = await fetch('/api/reindex?mode=changed-only', { method: 'POST' });
     const data = await r.json();
-    result.innerHTML = `<div class="flash flash-success">${data.message}</div>`;
+    if (data.status === 'started') {
+      result.innerHTML = '<div class="flash flash-success">Reindexing started in background...</div>';
+      const poll = setInterval(async () => {
+        try {
+          const st = await (await fetch('/api/status')).json();
+          if (!st.reindexing) {
+            clearInterval(poll);
+            result.innerHTML = '<div class="flash flash-success">Reindexing complete.</div>';
+            btn.disabled = false;
+          }
+        } catch { clearInterval(poll); btn.disabled = false; }
+      }, 1000);
+    } else if (data.status === 'already_running') {
+      result.innerHTML = '<div class="flash flash-error">Reindexing already in progress</div>';
+      btn.disabled = false;
+    } else {
+      result.innerHTML = `<div class="flash flash-success">${data.message}</div>`;
+      btn.disabled = false;
+    }
   } catch (err) {
     result.innerHTML = `<div class="flash flash-error">${err.message}</div>`;
-  } finally {
     btn.disabled = false;
   }
 });

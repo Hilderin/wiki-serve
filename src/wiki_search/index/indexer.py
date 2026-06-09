@@ -26,7 +26,6 @@ class Indexer:
         self.chunk_repo = ChunkRepository(db)
         self.embedder = embedder
         self._log_path = config.data_dir / "wiki.indexation.log"
-        config.data_dir.mkdir(parents=True, exist_ok=True)
         self._log("STARTUP", f"Indexer initialized (paths={config.include_paths})")
         for p in config.skipped_paths:
             self._log("WARNING", f"Include path does not exist, skipping: {p}")
@@ -35,10 +34,11 @@ class Indexer:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
         line = f"{ts} | {level:7s} | {message}"
         try:
+            self._log_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self._log_path, "a", encoding="utf-8") as f:
                 f.write(line + "\n")
-        except OSError:
-            pass
+        except OSError as e:
+            print(f"[wiki-serve] LOG WRITE FAILED ({e}): {line}", flush=True)
         if level in ("INDEXING", "VECTORS", "INDEXED", "VECTORED", "DELETED", "REMOVED", "SKIPPED", "REINDEX", "REBUILD", "STARTUP", "UP-TO-DATE", "WARNING", "ERROR"):
             print(f"[wiki-serve] {line}", flush=True)
 
