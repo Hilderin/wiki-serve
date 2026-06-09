@@ -24,6 +24,7 @@ from .search.embedder import Embedder
 from .search.rank import normalize_bm25_score, rerank_with_heading_boost
 from .db.repository import DocumentRepository, ChunkRepository
 from .index.watcher import start_watcher
+import markdown
 
 
 TEMPLATES_DIR = Path(__file__).parent / "web" / "templates"
@@ -33,6 +34,14 @@ _jinja = Environment(
     loader=FileSystemLoader(str(TEMPLATES_DIR)),
     autoescape=select_autoescape(["html"]),
 )
+
+
+_md_engine = markdown.Markdown(extensions=["tables", "fenced_code", "toc"])
+
+
+def _render_md(text: str) -> str:
+    _md_engine.reset()
+    return _md_engine.convert(text)
 
 
 def _render(name: str, **kwargs) -> str:
@@ -47,15 +56,23 @@ def _make_vscode_url():
     return helper
 
 
+def _strip_html(html: str) -> str:
+    import re
+    text = re.sub(r"<[^>]+>", " ", html)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
 def _format_search_result(r: dict) -> dict:
     score = r.get("score") or normalize_bm25_score(r.pop("bm25", 0))
-    excerpt = (r.get("content") or "")[:300].replace("\n", " ")
+    raw_content = r.get("content") or ""
+    excerpt_plain = _strip_html(_render_md(raw_content[:500]))[:300]
     vscode = _make_vscode_url()
     return {
         "path": r["path"],
         "heading_path": r.get("heading_path"),
         "score": score,
-        "excerpt": excerpt,
+        "excerpt": excerpt_plain,
         "start_line": r["start_line"],
         "end_line": r["end_line"],
         "vscode_url": vscode(r["path"], r["start_line"]),
@@ -198,14 +215,16 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
     async def section_page(path: str = Query(default=""), heading: str = Query(default=""), q: str | None = Query(default=None)):
         section = read_section_from_disk(config, path, heading)
         if section:
-            return _render("section.html", path=path, heading=heading, content=section["content"], start_line=section["start_line"], end_line=section["end_line"], query=q, vscode_url=_make_vscode_url())
+            html_content = _render_md(section["content"])
+            return _render("section.html", path=path, heading=heading, content=html_content, start_line=section["start_line"], end_line=section["end_line"], query=q, vscode_url=_make_vscode_url())
 
         with db.access():
             chunks = chunk_repo.get_chunks_by_heading(path, heading)
         if not chunks:
-            return _render("section.html", path=path, heading=heading, content="Section not found.", start_line=0, end_line=0, query=q, vscode_url=_make_vscode_url())
-        content = "\n".join(c["content"] for c in chunks)
-        return _render("section.html", path=path, heading=heading, content=content, start_line=chunks[0]["start_line"], end_line=chunks[-1]["end_line"], query=q, vscode_url=_make_vscode_url())
+            return _render("section.html", path=path, heading=heading, content="<p>Section not found.</p>", start_line=0, end_line=0, query=q, vscode_url=_make_vscode_url())
+        raw = "\n".join(c["content"] for c in chunks)
+        html_content = _render_md(raw)
+        return _render("section.html", path=path, heading=heading, content=html_content, start_line=chunks[0]["start_line"], end_line=chunks[-1]["end_line"], query=q, vscode_url=_make_vscode_url())
 
     @app.get("/status", response_class=HTMLResponse)
     async def status_page():

@@ -13,6 +13,6 @@
     {% endif %}
     <div class="lines">Lines {{ start_line }}–{{ end_line }}</div>
   </div>
-  <div class="section-content">{{ content }}</div>
+  <div class="section-content markdown-body">{{ content|safe }}</div>
 </div>
 {% endblock %}
