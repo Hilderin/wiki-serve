@@ -9,6 +9,11 @@ from . import markdown_chunker as chunker
 
 _cwd = Path.cwd()
 
+_DEFAULT_SKIP_NAMES = frozenset(s.lower() for s in {
+    "node_modules", ".git", ".venv", "__pycache__", "tmp", "temp",
+    ".ds_store", "thumbs.db", "desktop.ini", "agents.md",
+})
+
 
 def rel_path(filepath: Path) -> str:
     fp = filepath.resolve()
@@ -29,6 +34,20 @@ class Indexer:
         self._log("STARTUP", f"Indexer initialized (paths={config.include_paths})")
         for p in config.skipped_paths:
             self._log("WARNING", f"Include path does not exist, skipping: {p}")
+
+        self._skip_names: set[str] = set(_DEFAULT_SKIP_NAMES)
+        self._skip_dotfiles = True
+        self._allow_dot_names: set[str] = set()
+
+        for p in config.exclude_patterns:
+            if p == "!.*":
+                self._skip_dotfiles = False
+            elif p.startswith("!."):
+                self._allow_dot_names.add(p[1:].lower())
+            elif p.startswith("!"):
+                self._skip_names.discard(p[1:].lower())
+            else:
+                self._skip_names.add(p.lower())
 
     def _log(self, level: str, message: str) -> None:
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
@@ -133,11 +152,8 @@ class Indexer:
             self._log("REMOVED", f"Deleted directory ({count} documents): {prefix}")
         return count
 
-    _SKIP_DIRS = frozenset(s.lower() for s in {"node_modules", ".git", ".venv", "__pycache__", "tmp", "temp"})
-    _SKIP_FILES = frozenset(s.lower() for s in {".ds_store", "thumbs.db", "desktop.ini", "agents.md"})
-
     def _should_skip(self, path: Path, root: Path | None = None) -> bool:
-        if path.name.lower() in self._SKIP_FILES:
+        if path.name.lower() in self._skip_names:
             return True
         if root is not None:
             try:
@@ -147,7 +163,10 @@ class Indexer:
         else:
             check = path.parts
         for part in check:
-            if part.lower() in self._SKIP_DIRS or part.startswith("."):
+            part_lower = part.lower()
+            if part_lower in self._skip_names:
+                return True
+            if self._skip_dotfiles and part.startswith(".") and part_lower not in self._allow_dot_names:
                 return True
         return False
 

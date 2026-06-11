@@ -106,9 +106,25 @@ wiki-serve stdio              # Legacy stdio MCP server
 | `WIKI_PORT` | `8765` | HTTP port |
 | `WIKI_WATCH` | `true` | Enable file watching |
 | `WIKI_REINDEX_ON_START` | `true` | Reindex on startup |
+| `WIKI_EXCLUDE` | _(built-in defaults)_ | Semicolon-separated exclusion overrides. `name` excludes a name; `!name` removes a default exclusion; `!.specs` allows a dot-prefixed name; `!.*` disables the dot-prefix rule entirely |
 | `WIKI_EMBEDDING_ENABLED` | `true` | Enable vector search (requires model download on first run) |
 | `WIKI_EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | SentenceTransformer model name |
 | `WIKI_EMBEDDING_DEVICE` | `cpu` | Device for embedding model (`cpu` or `cuda`) |
+
+### Exclusions
+
+By default, these names are always skipped (case-insensitive): `node_modules`, `.git`, `.venv`, `__pycache__`, `tmp`, `temp`, `.ds_store`, `thumbs.db`, `desktop.ini`, `agents.md`.  
+Any file or directory starting with `.` is also skipped.
+
+Use `WIKI_EXCLUDE` to override:
+
+| Example | Effect |
+|---------|--------|
+| `WIKI_EXCLUDE="build"` | Also skip `build/` directories |
+| `WIKI_EXCLUDE="!.specs"` | Include `.specs` folder despite the dot-prefix rule |
+| `WIKI_EXCLUDE="!.*"` | Disable the dot-prefix rule entirely (include all dotfiles) |
+| `WIKI_EXCLUDE="!node_modules"` | Index `node_modules` (remove from default skip list) |
+| `WIKI_EXCLUDE="build;!.*"` | Skip `build/`, but include all dotfiles |
 
 ---
 

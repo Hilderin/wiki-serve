@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 class WikiSearchConfig:
     include_paths: list[Path]
     skipped_paths: list[Path] = field(default_factory=list)
+    exclude_patterns: list[str] = field(default_factory=list)
     index_path: Path = Path("./.wiki-index/wiki.sqlite").resolve()
     watch: bool = True
     reindex_on_start: bool = True
@@ -35,10 +36,14 @@ class WikiSearchConfig:
                 msg = f"[wiki-serve] WARNING: Include path does not exist, skipping: {p}"
                 print(msg, file=sys.stderr, flush=True)
 
+        raw_exclude = os.environ.get("WIKI_EXCLUDE", "").strip()
+        exclude_patterns = [p.strip() for p in raw_exclude.split(";") if p.strip()] if raw_exclude else []
+
         data_dir = Path(os.environ.get("WIKI_DATA_DIR", "./.wiki-index")).resolve()
         return cls(
             include_paths=valid_paths,
             skipped_paths=skipped_paths,
+            exclude_patterns=exclude_patterns,
             index_path=(data_dir / "wiki.sqlite").resolve(),
             watch=os.environ.get("WIKI_WATCH", "true").lower() in ("true", "1", "yes"),
             reindex_on_start=os.environ.get("WIKI_REINDEX_ON_START", "true").lower() in ("true", "1", "yes"),
