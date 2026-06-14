@@ -96,8 +96,6 @@ def create_app(config: WikiSearchConfig | None = None) -> FastAPI:
         if not db.vec_available:
             print("[wiki-serve] WARNING: sqlite-vec not available, embeddings disabled (install sqlite-vec for vector search)", flush=True)
             embedder = None
-        else:
-            embedder.load()
     print(f"[wiki-serve] Embeddings: {'enabled' if embedder else 'disabled'}", flush=True)
     indexer = Indexer(db, config, embedder=embedder)
     _reindexing = threading.Event()
