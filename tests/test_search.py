@@ -107,6 +107,22 @@ def test_search_multiple_terms(wiki_dir, indexer, searcher):
     assert any(r["path"] == rel_path(a) for r in results)
 
 
+def test_search_with_apostrophe(wiki_dir, indexer, searcher):
+    filepath = wiki_dir / "doc.md"
+    filepath.write_text("# Document\n\nL'utilisateur configure l'apostrophe.\n")
+    indexer.reindex_changed_only()
+
+    results = searcher.search("l'apostrophe")
+    assert len(results) >= 1
+    assert results[0]["path"] == rel_path(filepath)
+
+    results = searcher.search("don't stop")
+    assert isinstance(results, list)
+
+    results = searcher.search("l'utilisateur l'agent")
+    assert isinstance(results, list)
+
+
 def test_read_section(wiki_dir, indexer, db):
     filepath = wiki_dir / "doc.md"
     filepath.write_text("# Title\n\n## Section\n\nSpecific content here.\n\n## Other\n\nOther content.\n")

@@ -1,3 +1,4 @@
+import sqlite3
 import struct
 from typing import Any
 
@@ -178,25 +179,30 @@ class ChunkRepository:
         fts_query = self._prepare_query(query)
         if not fts_query:
             return []
-        rows = self.db.conn.execute(
-            """SELECT c.id, c.path, c.heading_path, c.heading_level, c.content,
-                      c.start_line, c.end_line, rank AS bm25
-               FROM chunks_fts
-               JOIN chunks c ON chunks_fts.rowid = c.id
-               WHERE chunks_fts MATCH ?
-               ORDER BY rank
-               LIMIT ?""",
-            (fts_query, limit),
-        ).fetchall()
+        try:
+            rows = self.db.conn.execute(
+                """SELECT c.id, c.path, c.heading_path, c.heading_level, c.content,
+                          c.start_line, c.end_line, rank AS bm25
+                   FROM chunks_fts
+                   JOIN chunks c ON chunks_fts.rowid = c.id
+                   WHERE chunks_fts MATCH ?
+                   ORDER BY rank
+                   LIMIT ?""",
+                (fts_query, limit),
+            ).fetchall()
+        except sqlite3.OperationalError as e:
+            print(f"[wiki-serve] FTS query rejected: {e} (query={fts_query!r})", flush=True)
+            return []
         return [dict(r) for r in rows]
 
     def _prepare_query(self, query: str) -> str:
         query = query.strip()
         if not query:
             return ""
-        if any(op in query for op in ('"', "'", "(", ")", "*", "NEAR", "AND", "OR", "NOT")):
+        query = query.replace("'", " ").replace("’", " ")
+        if any(op in query for op in ('"', "(", ")", "*", "NEAR", "AND", "OR", "NOT")):
             return query
         terms = query.split()
         if not terms:
             return ""
-        return " AND ".join(f'"{t}"' for t in terms)
+        return " OR ".join(f'"{t}"' for t in terms)

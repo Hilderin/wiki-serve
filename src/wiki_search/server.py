@@ -15,6 +15,7 @@ from .index.indexer import Indexer
 from .index.watcher import start_watcher
 from .search.hybrid_search import HybridSearcher
 from .search.exact_search import ExactSearcher
+from .search.embedder import Embedder
 from .mcp_tools.search_wiki import (
     SEARCH_WIKI_TOOL,
     SEARCH_EXACT_TOOL,
@@ -33,6 +34,12 @@ async def main_stdio() -> None:
     initialize_database(db)
 
     indexer = Indexer(db, config)
+    embedder = None
+
+    if config.embedding_enabled and db.vec_available:
+        embedder = Embedder(config.embedding_model, config.embedding_device)
+        embedder.load()
+        indexer.embedder = embedder
 
     if config.reindex_on_start:
         reindex_done = asyncio.Event()
@@ -53,7 +60,7 @@ async def main_stdio() -> None:
         _ = asyncio.create_task(_keep_watcher_alive(observer))
         print(f"[wiki-serve] File watcher started on {len(config.include_paths)} path(s)", file=sys.stderr)
 
-    hybrid = HybridSearcher(db)
+    hybrid = HybridSearcher(db, embedder)
     exact = ExactSearcher(db)
     server = Server("wiki-serve")
 
